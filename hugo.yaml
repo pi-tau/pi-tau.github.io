@@ -15,7 +15,7 @@ params:
   # set theme to full screen width otherwise it is 80 characters
   fullWidthTheme: false
   # center theme with default width
-  centerTheme: true
+  centerTheme: false
 
 languages:
   en:
