@@ -1,8 +1,6 @@
 +++
 title = "Simulating a go channel in Go"
 date = "2023-06-28"
-description = " "
-showFullContent = false
 +++
 
 The interface that we want to support ?

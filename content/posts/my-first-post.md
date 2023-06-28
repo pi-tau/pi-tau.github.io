@@ -1,9 +1,6 @@
 +++
 title = "My First Post"
 date = "2023-06-28"
-cover = "" # add cover image
-description = " "
-showFullContent = false
 +++
 
 # REINFORCEMENT LEARNING
