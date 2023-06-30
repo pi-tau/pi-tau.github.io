@@ -31,14 +31,6 @@
           </span>
         {{ end }}
 
-        {{ partial "cover.html" . }}
-
-        <div class="post-content">
-          {{ if .Params.Description }}
-            {{ .Description | markdownify }}
-          {{ end }}
-        </div>
-
       </article>
     {{ end }}
 
