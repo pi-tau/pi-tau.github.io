@@ -150,8 +150,17 @@ layers are used for reducing and subsequently increasing the channels, thus
 making the $3 \times 3$ conv a bottleneck. Here, however, the $1 \times 1$ conv
 layers are used for intermixing the information along the channels before and
 after applying the grouped convolution. We don't have to reduce the channels and
-have the $3 \times 3$ grouped conv behave like a bottleneck. In fact, we
-probably want to increase them to make the network wider.
+have the $3 \times 3$ grouped conv behave like a bottleneck. In fact, the
+results of [[^RegNet]] show that both reducing (bottleneck) and increasing
+(inverted bottleneck) channels degrades the performance.
+
+At the extreme you could use $g=C$ as proposed in [[^MobileNet]], which means
+having each group contain only one channel. Combining this with a $1 \times 1$
+convolution afterwards leads to the famous *depthwise separable convolution*.
+This combination leads to a separation of spatial and channel mixing, where
+each operation either mixes information across spatial or channel dimension,
+but not both. This approach greatly reduces the number of parameters in the
+model, but may also harm accuracy.
 
 
 # THE ARCHITECTURE OF THE RESNET
@@ -179,24 +188,44 @@ branch we need to add a batch norm and a relu layers before the $1 \times 1$
 convolution.
 
 The final ResNet architecture consists of stacking ResBlocks, with occasionally
-downscaling the image with Downscale ResBlocks. The number of stages should be
-such that the spatial dimensions of the tensor are reduced to $\sim 8 \times 8$.
-For CIFAR-10, for example, we need 3 stages. For ImageNet what is done in
-practice is that the very first convolution is a $7 \times 7$ conv layer with
-stride of 2, scaling the input from $224 \times 224$ to $112 \times 112$. Then 4
-stages are applied further reducing the size to $112 / 2^4 = 7 \times 7$.
+downscaling the image with Downscale ResBlocks. After that a Global average
+pooling layer is applied as proposed in [[^NiN]]. The original idea was to have
+the final convolution produce a tensor with the same number of channels as the
+number of classes, each channel corresponding to a confidence map for the given
+class. Replacing FC layers with global average pooling would not be as effective
+if were using linear convolutions instead of micro-networks. Later models,
+however, take a less extreme approach and add one more FC layer to scale the
+output to match the number of classes.
+
+The number of stages should be such that the spatial dimensions of the tensor
+are reduced to $\sim 8 \times 8$. For CIFAR-10, for example, we need 3 stages.
+For ImageNet what is done in practice is that the very first convolution is a
+$7 \times 7$ conv layer with stride of 2, scaling the input from
+$224 \times 224$ to $112 \times 112$. Then 4 stages are applied further reducing
+the size to $112 / 2^4 = 7 \times 7$.
 
 ![ResNet](/res-nets/resnet.png "General ResNet architecture for 3x32x32 inputs")
 
 However, we still need to choose the channels for each stage
-$C_1, C_2, C_3, \dots$, the blocks withing each stage $B_1, B_2, B_3, \dots$,
+$C_1, C_2, C_3, \dots$, the blocks within each stage $B_1, B_2, B_3, \dots$,
 and also the groups within each block (if using ResNeXt blocks)
-$g_1, g_2, g_3, \dots$.
+$g_1, g_2, g_3, \dots$. Exploring the possible combinations to find the best
+solution is clearly infeasible, but there are a few guiding principles that we
+can use. The paper[^RegNet] *"Designing network design spaces"* by Iliya
+Radosavovic et. al. explores what the relation between these parameters should
+be, so that models at any scale would perform well. This lead to the design of
+the RegNet and the following principles:
+1. Do not use any bottleneck.
+2. Share the number of groups for all stages, i.e., $g_i = g \quad \forall i$.
+3. Increase the number of channels across stages, i.e., $C_{i+1} \geq C_i$.
+In practice channels are usually doubled at every stage, however the authors
+report top performance at $C_{i+1} \approx 2.5 C_i$.
+4. Increase the number of blocks in each stage, i.e., $B_{i+1} \geq B_i$, but
+not necessarily in the last stage. The pattern 1:1:3:1 is rather famous for
+networks with four stages.
+5. Best performing models are usually around 20 blocks deep in total, and the
+other parameters are used to control the number of FLOPs.
 
-
-<!-- # ARCHITECTURAL DECELOPMENT
-# REVNET ? ANYNET
-# HIGHWAY NET: HONORABLE MENTION -->
 
 [^ResNet]: [2015](https://arxiv.org/abs/1512.03385) "Deep residual learning for image
 recognition" by Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
@@ -221,3 +250,10 @@ Piotr Dollár, Zhuowen Tu, Kaiming He
 [^Incept]: [2014](https://arxiv.org/abs/1409.4842) "Going deeper with
 convolutions" by Christian Szegedy, Wei Liu, Yangqing Jia, Pierre Sermanet,
 Scott Reed, Dragomir Anguelov, Dumitru Erhan, Vincent Vanhoucke, Andrew Rabinovich
+[^RegNet]: [2020](https://arxiv.org/abs/2003.13678) "Designing network design
+spaces" by Ilija Radosavovic, Raj Prateek Kosaraju, Ross Girshick, Kaiming He,
+Piotr Dollár
+[^MobileNet]: [2017](https://arxiv.org/abs/1704.04861) "MobileNets: efficient
+convolutional neural networks for mobile vision application" by Andrew G. Howard,
+Menglong Zhu, Bo Chen, Dmitry Kalenichenko, Weijun Wang, Tobias Weyand, Marco
+Andreetto, Hartwig Adam
