@@ -13,7 +13,7 @@ transformer model[^Transformer] and why some specific design choices were made.
 
 But first, a longer explanation about the attention layer in the transformer...
 [Skip to the code](#multi-head-attention-layer) if you don't feel like reading
-text.
+text. Also check out [github](https://github.com/pi-tau/transformer).
 
 # ATTENTION
 What this layer does is it takes a sequence of elements $x_1, x_2, \dots, x_T$
