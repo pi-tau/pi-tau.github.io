@@ -6,7 +6,7 @@ mathjax = true
 +++
 
 The ResNet was introduced in the [paper](https://arxiv.org/abs/1512.03385)[^ResNet]
-*"Deep residual learning for image recognition"* by Kaiming He et. al. in 2015.
+*"Deep residual learning for image recognition"* by Kaiming He et al. in 2015.
 So what is the problem that its design was trying to solve? My first thought was
 that it improves gradient flow and allows for easier training of much deeper
 models, but that's not it. The problem with vanishing/exploding gradients was
@@ -95,7 +95,7 @@ addition to up-scaling the channels it is also used to create a micro-network.
 A single $3 \times 3$ conv layer is a linear filter that applies a linear
 transformation to the input data. In the
 [paper](https://arxiv.org/abs/1312.4400)[^NiN] *"Network in network"*, by Lin
-et. al. the authors argue that it would be beneficial to replace the single conv
+et al. the authors argue that it would be beneficial to replace the single conv
 layer with a "micro-network" structure acting on the same $3 \times 3$ patch.
 Now, instead of sliding a linear kernel along the image, we will be sliding the
 entire "micro-network". Practically, this idea is realized by stacking
@@ -121,7 +121,7 @@ Unfortunately, increasing the number of channels increases the computational
 costs quadratically (not speed! since it's parallelizable). To fix this problem
 the ResNeXt block was proposed in the
 [paper](https://arxiv.org/abs/1611.05431)[^ResNeXt] *"Aggregated residual
-transformations for deep neural networks"* by Xie et. al. The idea follows the
+transformations for deep neural networks"* by Xie et al. The idea follows the
 *split-transform-merge* strategy:
 * we first split the channels $C$ of the input into $g$ independent groups;
 * we then apply different convolutional transformations to each of the groups
@@ -212,7 +212,7 @@ and also the groups within each block (if using ResNeXt blocks)
 $g_1, g_2, g_3, \dots$. Exploring the possible combinations to find the best
 solution is clearly infeasible, but there are a few guiding principles that we
 can use. The paper[^RegNet] *"Designing network design spaces"* by Iliya
-Radosavovic et. al. explores what the relation between these parameters should
+Radosavovic et al. explores what the relation between these parameters should
 be, so that models at any scale would perform well. This lead to the design of
 the RegNet and the following principles:
 1. Do not use any bottleneck.
