@@ -476,7 +476,7 @@ translating between english and french, or english and german, then around
 So, yeah, maybe in these specific cases it makes sense, but otherwise -- I don't
 think so.
 
-(I wonder why nobody tries translating between german and french :?
+(I wonder why nobody reports translating between german and french :?
 Don't sue me!)
 
 Regarding sharing the same weight matrix between the target word embeddings and
@@ -495,7 +495,7 @@ scale the word embeddings before adding them to the positional embeddings.
 Obviously, this scale parameter will depend on the initialization of the word
 embeddings and positional embeddings, whether we use sine and cosine positional
 encoding, whether we add or concatenate, and so on.. The original paper vaguely
-mentions that they are using a scale of $\sqrt{d_model}$, but honestly... no one
+mentions that they are using a scale of $\sqrt{d_{model}}$, but honestly... no one
 knows why..
 
 
@@ -641,6 +641,129 @@ forward them through an additional linear layer to reduce the dimensionality
 back to $d_{model}$, or adjust the attention layer to accept key-value memory
 with dimension different from the query dimension. Anyway, I have never seen
 anyone do that and also I just made that up, so maybe don't do it.
+
+
+# SEQUENCE-TO-SEQUENCE
+In order to generate a sequence during inference we will use a simple greedy
+decoding strategy. (Maybe I will add beam search at some point.)
+
+```python
+class Transformer(nn.Module):
+    def __init__(self, ...):
+        # ...
+
+    def encode(self, src, src_mask):
+        # ...
+
+    def decode(self, tgt, mem, mem_mask):
+        # ...
+
+    def forward(self, src, tgt, src_mask=None):
+        # ...
+
+    @torch.no_grad()
+    def greedy_decode(self, src, src_mask, bos_idx, eos_idx, max_len=80):
+        B = src.shape[0]
+        done = {i : False for i in range(B)}
+        was_training = self.training
+        self.eval()
+
+        tgt = torch.LongTensor([[bos_idx]] * B).to(src.device)
+        mem = self.encode(src, src_mask)
+        for _ in range(max_len-1):
+            out = self.decode(tgt, mem, mem_mask=src_mask)
+            scores = F.linear(out, self.tgt_proj_weight)
+            next_idx = torch.max(scores[:, -1:], dim=-1).indices
+            tgt = torch.concat((tgt, next_idx), dim=1)
+
+            for i, idx in enumerate(next_idx):
+                if idx[0] == eos_idx: done[i] = True
+            if False not in done.values(): break
+
+        if was_training: self.train()
+        return tgt
+```
+
+The decoding function takes as argument the source sequence to be decoded and
+the start and end tokens. We will first encode the source sequence by running it
+through the encoder stack and then we will prompt the decoder with the start
+token to start generating. The decoded sequence will be generated one element at
+a time. At every step of the loop we feed the decoder the entire target sequence
+that has been generated until now. For each element the decoder will output
+scores over the target vocabulary indicating which should be the next element.
+We are only concerned with the scores for the last element of the sequence,
+because they are used to predict the next element. Decoding continues until
+the end token is produced.
+
+Since we are decoding a batch of sequences, we need to continue iterating until
+every sequence in the batch has been decoded. To keep track of that we will
+simply update a dict indicating which sequences are done.
+
+Note that the provided tokens for beginning of sequence (bos) and end of
+sequence (eos) don't have to be the special `<START>` and `<END>` tokens. We could
+try to start the sequence with any item from the vocabulary. We could also
+try to end the sequence with any item, but keep in mind that the model was
+trained to end sequences specifically with the `<END>` token.
+
+
+# SO? DOES IT WORK?
+To quickly test the code we will try to learn a simple task: reversing the order
+of a sequence.
+
+```python
+from torch.nn.utils.rnn import pad_sequence
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+bos_idx, eos_idx, pad_idx = 1, 2, 0
+vocab_size, max_len = 100, 16
+
+data_loader = data.DataLoader(  # random sequences of different lengths
+    dataset=[torch.randint(3, vocab_size, (randint(max_len//2, max_len),)) for _ in range(50000)],
+    batch_size=128, shuffle=True, drop_last=True,
+    collate_fn=lambda batch: (
+        pad_sequence(batch, batch_first=True, padding_value=pad_idx),
+        pad_sequence(           # flip the sequence and add <START> and <END> tags
+            [torch.LongTensor([bos_idx] + x.flip(0).tolist() + [eos_idx]) for x in batch],
+            batch_first=True, padding_value=pad_idx,
+    )),
+)
+```
+
+The dataset will consist of 50000 random sequences of numbers with varying
+lengths between 8 and 16 elements. The target sequence is simply the reversed
+sequence nested between `<START>` and `<END>` tags. The data loader will
+generate random batches from the training set and will automatically pad shorter
+sequences to match the length of the longest sequence in the batch.
+
+```python
+transformer = Transformer(
+    src_vocab_size=vocab_size, tgt_vocab_size=None, max_seq_len=256,
+    d_model=64, n_heads=1, n_enc=2, n_dec=2, dim_mlp=128, dropout=0.1,
+).to(device)
+optim = torch.optim.Adam(transformer.parameters(), lr=1e-3, weight_decay=0.)
+
+for _ in range(30):
+    for src, tgt in data_loader:
+        src, tgt = src.to(device), tgt.to(device)
+        tgt_in, tgt_out = tgt[:, :-1], tgt[:, 1:]
+        logits = transformer(src, tgt_in, (src != pad_idx))
+        loss = F.cross_entropy(
+            logits.permute(0,2,1), tgt_out, ignore_index=pad_idx)
+
+        optim.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(transformer.parameters(), 1.)
+        optim.step()
+```
+
+We will use a relatively small model for this simple task. Since both the source
+and the target sequences come from the same vocabulary, we will share the word
+embedding matrices by setting `tgt_vocab_size=None`. Note that during training
+we feed all but the last element of the target sequence. We don't want to feed
+the `<END>` token, we only want the model to predict it. When computing the loss
+we compare the predictions of the model with all but the first element of the
+target sequence.
+
 
 <!--
 # MISC
