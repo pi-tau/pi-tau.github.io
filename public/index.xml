@@ -84,7 +84,19 @@ the rest. In the &lt;em&gt;cross-attention layer&lt;/em&gt; (used in the decoder
 store is built from the source sequence processed by the encoder. Then every
 element from the target sequence is decoded by querying this key-value store
 like a memory database.&lt;/p&gt;
-&lt;!-- raw HTML omitted --&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/transformer/key-value-store.png&#34; alt=&#34;Database&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;Standard key-value table lookup
+(left) Soft key-value table lookup (right)&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
 &lt;h2 id=&#34;multi-head-attention-layer&#34;&gt;MULTI-HEAD ATTENTION LAYER&lt;/h2&gt;
 &lt;p&gt;One problem with the proposed self-attention mechanism is that an output $z_i$
 will most likely be dominated by a single $v_i$, because the softmax quickly

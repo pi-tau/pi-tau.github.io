@@ -82,8 +82,8 @@ store is built from the source sequence processed by the encoder. Then every
 element from the target sequence is decoded by querying this key-value store
 like a memory database.
 
-<!-- add pic of soft and hard lookup -->
-
+![Database](/transformer/key-value-store.png "Standard key-value table lookup
+(left) Soft key-value table lookup (right)")
 
 ## MULTI-HEAD ATTENTION LAYER
 

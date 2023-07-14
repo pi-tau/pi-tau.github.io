@@ -266,7 +266,19 @@ the rest. In the <em>cross-attention layer</em> (used in the decoder) the key-va
 store is built from the source sequence processed by the encoder. Then every
 element from the target sequence is decoded by querying this key-value store
 like a memory database.</p>
-<!-- raw HTML omitted -->
+<p>
+  <figure>
+    <style>
+        small {
+            font-size: 90%;
+        }
+    </style>
+    <img src="/transformer/key-value-store.png" alt="Database">
+    <figcaption><small>Standard key-value table lookup
+(left) Soft key-value table lookup (right)</small></figcaption>
+  </figure>
+
+</p>
 <h2 id="multi-head-attention-layer">MULTI-HEAD ATTENTION LAYER<a href="#multi-head-attention-layer" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
 <p>One problem with the proposed self-attention mechanism is that an output $z_i$
 will most likely be dominated by a single $v_i$, because the softmax quickly
