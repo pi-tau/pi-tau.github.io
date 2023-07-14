@@ -178,6 +178,20 @@ src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
 
   
+    <div class="table-of-contents">
+      <h2>
+        CONTENTS
+      </h2>
+      <nav id="TableOfContents">
+  <ul>
+    <li><a href="#the-residual-block-empowering-deeper-networks">THE RESIDUAL BLOCK: EMPOWERING DEEPER NETWORKS</a></li>
+    <li><a href="#the-bottleneck-block-reducing-computational-overhead">THE BOTTLENECK BLOCK: REDUCING COMPUTATIONAL OVERHEAD</a></li>
+    <li><a href="#the-resnext-block-going-wider-instead-deeper">THE RESNEXT BLOCK: GOING WIDER INSTEAD DEEPER</a></li>
+    <li><a href="#the-architecture-of-the-resnet">THE ARCHITECTURE OF THE RESNET</a></li>
+  </ul>
+</nav>
+    </div>
+  
 
   <div class="post-content"><div>
         <p>The ResNet was introduced in the <a href="https://arxiv.org/abs/1512.03385">paper</a><sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup>
@@ -219,7 +233,7 @@ training error.</p>
 <p>(Note that we might simply be having issues optimizing the larger model because
 batch norm and weight init are not doing a good job :? But the assumption is
 that they are doing a good job.)</p>
-<h1 id="the-residual-block-empowering-deeper-networks">THE RESIDUAL BLOCK: EMPOWERING DEEPER NETWORKS<a href="#the-residual-block-empowering-deeper-networks" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<h2 id="the-residual-block-empowering-deeper-networks">THE RESIDUAL BLOCK: EMPOWERING DEEPER NETWORKS<a href="#the-residual-block-empowering-deeper-networks" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
 <p>Simply stacking one more layer on top of our current model results in applying
 a function $F(x)=f(x)$ to the output of our model $x$. The paper proposes to
 change the wiring of our network by adding a shortcut connection so that
@@ -270,7 +284,7 @@ the &#39;Pre-activation&#39; ResNet block (right)</small></figcaption>
   </figure>
 
 </p>
-<h1 id="the-bottleneck-block-reducing-computational-overhead">THE BOTTLENECK BLOCK: REDUCING COMPUTATIONAL OVERHEAD<a href="#the-bottleneck-block-reducing-computational-overhead" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<h2 id="the-bottleneck-block-reducing-computational-overhead">THE BOTTLENECK BLOCK: REDUCING COMPUTATIONAL OVERHEAD<a href="#the-bottleneck-block-reducing-computational-overhead" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
 <p>Since training deep networks could be very expensive the original paper proposes
 a so-called <em>&ldquo;bottleneck&rdquo;</em> block for all models deeper than 50 layers. Instead
 of two $3 \times 3$ layers, a stack of three layers is used: $1 \times 1$,
@@ -305,7 +319,7 @@ Now, instead of sliding a linear kernel along the image, we will be sliding the
 entire &ldquo;micro-network&rdquo;. Practically, this idea is realized by stacking
 $1 \times 1$ layers on top of the $3 \times 3$ layer. In our case we have one
 $1 \times 1$ layer resulting in a two-layer fully connected micro network.</p>
-<h1 id="the-resnext-block-going-wider-instead-deeper">THE RESNEXT BLOCK: GOING WIDER INSTEAD DEEPER<a href="#the-resnext-block-going-wider-instead-deeper" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<h2 id="the-resnext-block-going-wider-instead-deeper">THE RESNEXT BLOCK: GOING WIDER INSTEAD DEEPER<a href="#the-resnext-block-going-wider-instead-deeper" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
 <p>Using the ResNet block we can create super deep models (think ~1000 layers) and
 now the performance of the model will not degrade. But will it improve? Well,
 no. Stacking more layers will improve performance up to some point and beyond
@@ -370,7 +384,7 @@ This combination leads to a separation of spatial and channel mixing, where
 each operation either mixes information across spatial or channel dimension,
 but not both. This approach greatly reduces the number of parameters in the
 model, but may also harm accuracy.</p>
-<h1 id="the-architecture-of-the-resnet">THE ARCHITECTURE OF THE RESNET<a href="#the-architecture-of-the-resnet" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<h2 id="the-architecture-of-the-resnet">THE ARCHITECTURE OF THE RESNET<a href="#the-architecture-of-the-resnet" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
 <p>So the ResNet is constructed by stacking residual blocks one after another, but
 there are a few subtleties. A typical conv network is divided into stages and
 in each stage several residual blocks are applied, operating on fixed dimensions

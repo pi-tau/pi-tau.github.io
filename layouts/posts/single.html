@@ -38,7 +38,7 @@
   {{ if (.Params.Toc | default .Site.Params.Toc) }}
     <div class="table-of-contents">
       <h2>
-        {{ (.Params.TocTitle | default .Site.Params.TocTitle) | default "Table of Contents" }}
+        {{ (.Params.TocTitle | default .Site.Params.TocTitle) | default "CONTENTS" }}
       </h2>
       {{ .TableOfContents }}
     </div>

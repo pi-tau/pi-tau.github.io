@@ -7,6 +7,7 @@ date: 2023-07-13
 description: A blog post about the Transformer model with even more annotations
 keywords: ["transformer", "nlp", "deep learning", "multi-head attention", "implementation details", "explained"]
 mathjax: true
+ToC: true
 ---
 
 This post is based on the
@@ -19,7 +20,7 @@ But first, a longer explanation about the attention layer in the transformer...
 [Skip to the code](#multi-head-attention-layer) if you don't feel like reading
 text. Also check out [github](https://github.com/pi-tau/transformer).
 
-# ATTENTION
+## ATTENTION
 What this layer does is it takes a sequence of elements $x_1, x_2, \dots, x_T$
 and for every element $x_i$ produces an encoding $z_i$, that captures somehow
 the context of $x_i$, i.e., it is coupled with all other elements of the
@@ -84,7 +85,7 @@ like a memory database.
 <!-- add pic of soft and hard lookup -->
 
 
-# MULTI-HEAD ATTENTION LAYER
+## MULTI-HEAD ATTENTION LAYER
 
 One problem with the proposed self-attention mechanism is that an output $z_i$
 will most likely be dominated by a single $v_i$, because the softmax quickly
@@ -245,7 +246,7 @@ A smaller space could easily do the job, and it would prevent the model from
 overfitting.
 
 
-# ENCODER BLOCK
+## ENCODER BLOCK
 The encoder is a stack of $N$ identical blocks applied one after another. Each
 encoder block has a self-attention layer followed by a position-wise
 fully-connected network. Dropout is applied after each of the sub-layers followed
@@ -348,7 +349,7 @@ add an additional LayerNorm layer after the final encoder block in the encoder
 stack.
 
 
-# DECODER BLOCK
+## DECODER BLOCK
 The decoder is a stack of $M$ identical blocks applied one after another.
 
 ```python
@@ -432,7 +433,7 @@ of the last.
 ![Decoder](/transformer/decoder.png "Pre-LayerNorm transformer decoder block")
 
 
-# TOKEN EMBEDDING LAYER
+## TOKEN EMBEDDING LAYER
 Note that both the encoder and the decoder layers accept input as sequences
 of vectors, meaning that we can use these layers for any problem where our
 data is already vector-encoded. However, if we want to apply these layers to
@@ -536,7 +537,7 @@ we don't exceed the maximum sequence length.
 embedding and positional embedding")
 
 
-# TRANSFORMER
+## TRANSFORMER
 Finally, let's see how everything connects to construct the transformer model.
 
 ```python
@@ -647,7 +648,7 @@ with dimension different from the query dimension. Anyway, I have never seen
 anyone do that and also I just made that up, so maybe don't do it.
 
 
-# SEQUENCE-TO-SEQUENCE
+## SEQUENCE-TO-SEQUENCE
 In order to generate a sequence during inference we will use a simple greedy
 decoding strategy. (Maybe I will add beam search at some point.)
 
@@ -710,7 +711,7 @@ try to end the sequence with any item, but keep in mind that the model was
 trained to end sequences specifically with the `<END>` token.
 
 
-# SO? DOES IT WORK?
+## SO? DOES IT WORK?
 To quickly test the code we will try to learn a simple task: reversing the order
 of a sequence.
 

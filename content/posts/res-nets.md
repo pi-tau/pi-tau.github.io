@@ -7,6 +7,7 @@ date: 2023-07-01
 description: A brief history of the most famous CNN architecture and how it was further improved
 keywords: ["cnn", "computer vision", "deep learning", "resnet", "resnext", "implementation details", "explained"]
 mathjax: True
+ToC: true
 ---
 
 The ResNet was introduced in the [paper](https://arxiv.org/abs/1512.03385)[^ResNet]
@@ -43,7 +44,7 @@ batch norm and weight init are not doing a good job :? But the assumption is
 that they are doing a good job.)
 
 
-# THE RESIDUAL BLOCK: EMPOWERING DEEPER NETWORKS
+## THE RESIDUAL BLOCK: EMPOWERING DEEPER NETWORKS
 Simply stacking one more layer on top of our current model results in applying
 a function $F(x)=f(x)$ to the output of our model $x$. The paper proposes to
 change the wiring of our network by adding a shortcut connection so that
@@ -78,7 +79,7 @@ side of the figure below).
 the 'Pre-activation' ResNet block (right)")
 
 
-# THE BOTTLENECK BLOCK: REDUCING COMPUTATIONAL OVERHEAD
+## THE BOTTLENECK BLOCK: REDUCING COMPUTATIONAL OVERHEAD
 Since training deep networks could be very expensive the original paper proposes
 a so-called *"bottleneck"* block for all models deeper than 50 layers. Instead
 of two $3 \times 3$ layers, a stack of three layers is used: $1 \times 1$,
@@ -107,7 +108,7 @@ $1 \times 1$ layers on top of the $3 \times 3$ layer. In our case we have one
 $1 \times 1$ layer resulting in a two-layer fully connected micro network.
 
 
-# THE RESNEXT BLOCK: GOING WIDER INSTEAD DEEPER
+## THE RESNEXT BLOCK: GOING WIDER INSTEAD DEEPER
 Using the ResNet block we can create super deep models (think ~1000 layers) and
 now the performance of the model will not degrade. But will it improve? Well,
 no. Stacking more layers will improve performance up to some point and beyond
@@ -167,7 +168,7 @@ but not both. This approach greatly reduces the number of parameters in the
 model, but may also harm accuracy.
 
 
-# THE ARCHITECTURE OF THE RESNET
+## THE ARCHITECTURE OF THE RESNET
 So the ResNet is constructed by stacking residual blocks one after another, but
 there are a few subtleties. A typical conv network is divided into stages and
 in each stage several residual blocks are applied, operating on fixed dimensions

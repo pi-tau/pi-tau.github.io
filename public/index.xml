@@ -24,7 +24,7 @@ transformer model&lt;sup id=&#34;fnref:1&#34;&gt;&lt;a href=&#34;#fn:1&#34; clas
 &lt;p&gt;But first, a longer explanation about the attention layer in the transformer&amp;hellip;
 &lt;a href=&#34;#multi-head-attention-layer&#34;&gt;Skip to the code&lt;/a&gt; if you don&amp;rsquo;t feel like reading
 text. Also check out &lt;a href=&#34;https://github.com/pi-tau/transformer&#34;&gt;github&lt;/a&gt;.&lt;/p&gt;
-&lt;h1 id=&#34;attention&#34;&gt;ATTENTION&lt;/h1&gt;
+&lt;h2 id=&#34;attention&#34;&gt;ATTENTION&lt;/h2&gt;
 &lt;p&gt;What this layer does is it takes a sequence of elements $x_1, x_2, \dots, x_T$
 and for every element $x_i$ produces an encoding $z_i$, that captures somehow
 the context of $x_i$, i.e., it is coupled with all other elements of the
@@ -85,7 +85,7 @@ store is built from the source sequence processed by the encoder. Then every
 element from the target sequence is decoded by querying this key-value store
 like a memory database.&lt;/p&gt;
 &lt;!-- raw HTML omitted --&gt;
-&lt;h1 id=&#34;multi-head-attention-layer&#34;&gt;MULTI-HEAD ATTENTION LAYER&lt;/h1&gt;
+&lt;h2 id=&#34;multi-head-attention-layer&#34;&gt;MULTI-HEAD ATTENTION LAYER&lt;/h2&gt;
 &lt;p&gt;One problem with the proposed self-attention mechanism is that an output $z_i$
 will most likely be dominated by a single $v_i$, because the softmax quickly
 saturates. In order to have our $z_i$ &amp;ldquo;pay attention&amp;rdquo; to multiple $v_i$s we
@@ -221,7 +221,7 @@ not just any matrix, but a matrix with rank $d_k$.&lt;/p&gt;
 &lt;p&gt;Query and key embeddings don&amp;rsquo;t have to be in the large $D$-dimensional space.
 A smaller space could easily do the job, and it would prevent the model from
 overfitting.&lt;/p&gt;
-&lt;h1 id=&#34;encoder-block&#34;&gt;ENCODER BLOCK&lt;/h1&gt;
+&lt;h2 id=&#34;encoder-block&#34;&gt;ENCODER BLOCK&lt;/h2&gt;
 &lt;p&gt;The encoder is a stack of $N$ identical blocks applied one after another. Each
 encoder block has a self-attention layer followed by a position-wise
 fully-connected network. Dropout is applied after each of the sub-layers followed
@@ -319,7 +319,7 @@ and &amp;#39;Pre-LayerNorm&amp;#39; transformer encoder block (right)&lt;/small&
 final outputs of the encoder stack will not be normalized. To fix this we will
 add an additional LayerNorm layer after the final encoder block in the encoder
 stack.&lt;/p&gt;
-&lt;h1 id=&#34;decoder-block&#34;&gt;DECODER BLOCK&lt;/h1&gt;
+&lt;h2 id=&#34;decoder-block&#34;&gt;DECODER BLOCK&lt;/h2&gt;
 &lt;p&gt;The decoder is a stack of $M$ identical blocks applied one after another.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;DecoderBlock&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
 &lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(self, d_model, n_heads, dim_mlp, dropout):
@@ -402,7 +402,7 @@ of the last.&lt;/p&gt;
   &lt;/figure&gt;
 
 &lt;/p&gt;
-&lt;h1 id=&#34;token-embedding-layer&#34;&gt;TOKEN EMBEDDING LAYER&lt;/h1&gt;
+&lt;h2 id=&#34;token-embedding-layer&#34;&gt;TOKEN EMBEDDING LAYER&lt;/h2&gt;
 &lt;p&gt;Note that both the encoder and the decoder layers accept input as sequences
 of vectors, meaning that we can use these layers for any problem where our
 data is already vector-encoded. However, if we want to apply these layers to
@@ -498,7 +498,7 @@ embedding and positional embedding&lt;/small&gt;&lt;/figcaption&gt;
   &lt;/figure&gt;
 
 &lt;/p&gt;
-&lt;h1 id=&#34;transformer&#34;&gt;TRANSFORMER&lt;/h1&gt;
+&lt;h2 id=&#34;transformer&#34;&gt;TRANSFORMER&lt;/h2&gt;
 &lt;p&gt;Finally, let&amp;rsquo;s see how everything connects to construct the transformer model.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;Transformer&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
 &lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(
@@ -604,7 +604,7 @@ forward them through an additional linear layer to reduce the dimensionality
 back to $d_{model}$, or adjust the attention layer to accept key-value memory
 with dimension different from the query dimension. Anyway, I have never seen
 anyone do that and also I just made that up, so maybe don&amp;rsquo;t do it.&lt;/p&gt;
-&lt;h1 id=&#34;sequence-to-sequence&#34;&gt;SEQUENCE-TO-SEQUENCE&lt;/h1&gt;
+&lt;h2 id=&#34;sequence-to-sequence&#34;&gt;SEQUENCE-TO-SEQUENCE&lt;/h2&gt;
 &lt;p&gt;In order to generate a sequence during inference we will use a simple greedy
 decoding strategy. (Maybe I will add beam search at some point.)&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;Transformer&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
@@ -659,7 +659,7 @@ sequence (eos) don&amp;rsquo;t have to be the special &lt;code&gt;&amp;lt;START&
 try to start the sequence with any item from the vocabulary. We could also
 try to end the sequence with any item, but keep in mind that the model was
 trained to end sequences specifically with the &lt;code&gt;&amp;lt;END&amp;gt;&lt;/code&gt; token.&lt;/p&gt;
-&lt;h1 id=&#34;so-does-it-work&#34;&gt;SO? DOES IT WORK?&lt;/h1&gt;
+&lt;h2 id=&#34;so-does-it-work&#34;&gt;SO? DOES IT WORK?&lt;/h2&gt;
 &lt;p&gt;To quickly test the code we will try to learn a simple task: reversing the order
 of a sequence.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#f92672&#34;&gt;from&lt;/span&gt; torch.nn.utils.rnn &lt;span style=&#34;color:#f92672&#34;&gt;import&lt;/span&gt; pad_sequence
@@ -783,7 +783,7 @@ training error.&lt;/p&gt;
 &lt;p&gt;(Note that we might simply be having issues optimizing the larger model because
 batch norm and weight init are not doing a good job :? But the assumption is
 that they are doing a good job.)&lt;/p&gt;
-&lt;h1 id=&#34;the-residual-block-empowering-deeper-networks&#34;&gt;THE RESIDUAL BLOCK: EMPOWERING DEEPER NETWORKS&lt;/h1&gt;
+&lt;h2 id=&#34;the-residual-block-empowering-deeper-networks&#34;&gt;THE RESIDUAL BLOCK: EMPOWERING DEEPER NETWORKS&lt;/h2&gt;
 &lt;p&gt;Simply stacking one more layer on top of our current model results in applying
 a function $F(x)=f(x)$ to the output of our model $x$. The paper proposes to
 change the wiring of our network by adding a shortcut connection so that
@@ -834,7 +834,7 @@ the &amp;#39;Pre-activation&amp;#39; ResNet block (right)&lt;/small&gt;&lt;/figc
   &lt;/figure&gt;
 
 &lt;/p&gt;
-&lt;h1 id=&#34;the-bottleneck-block-reducing-computational-overhead&#34;&gt;THE BOTTLENECK BLOCK: REDUCING COMPUTATIONAL OVERHEAD&lt;/h1&gt;
+&lt;h2 id=&#34;the-bottleneck-block-reducing-computational-overhead&#34;&gt;THE BOTTLENECK BLOCK: REDUCING COMPUTATIONAL OVERHEAD&lt;/h2&gt;
 &lt;p&gt;Since training deep networks could be very expensive the original paper proposes
 a so-called &lt;em&gt;&amp;ldquo;bottleneck&amp;rdquo;&lt;/em&gt; block for all models deeper than 50 layers. Instead
 of two $3 \times 3$ layers, a stack of three layers is used: $1 \times 1$,
@@ -869,7 +869,7 @@ Now, instead of sliding a linear kernel along the image, we will be sliding the
 entire &amp;ldquo;micro-network&amp;rdquo;. Practically, this idea is realized by stacking
 $1 \times 1$ layers on top of the $3 \times 3$ layer. In our case we have one
 $1 \times 1$ layer resulting in a two-layer fully connected micro network.&lt;/p&gt;
-&lt;h1 id=&#34;the-resnext-block-going-wider-instead-deeper&#34;&gt;THE RESNEXT BLOCK: GOING WIDER INSTEAD DEEPER&lt;/h1&gt;
+&lt;h2 id=&#34;the-resnext-block-going-wider-instead-deeper&#34;&gt;THE RESNEXT BLOCK: GOING WIDER INSTEAD DEEPER&lt;/h2&gt;
 &lt;p&gt;Using the ResNet block we can create super deep models (think ~1000 layers) and
 now the performance of the model will not degrade. But will it improve? Well,
 no. Stacking more layers will improve performance up to some point and beyond
@@ -934,7 +934,7 @@ This combination leads to a separation of spatial and channel mixing, where
 each operation either mixes information across spatial or channel dimension,
 but not both. This approach greatly reduces the number of parameters in the
 model, but may also harm accuracy.&lt;/p&gt;
-&lt;h1 id=&#34;the-architecture-of-the-resnet&#34;&gt;THE ARCHITECTURE OF THE RESNET&lt;/h1&gt;
+&lt;h2 id=&#34;the-architecture-of-the-resnet&#34;&gt;THE ARCHITECTURE OF THE RESNET&lt;/h2&gt;
 &lt;p&gt;So the ResNet is constructed by stacking residual blocks one after another, but
 there are a few subtleties. A typical conv network is divided into stages and
 in each stage several residual blocks are applied, operating on fixed dimensions
