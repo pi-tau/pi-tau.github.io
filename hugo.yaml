@@ -3,6 +3,11 @@ languageCode: en-us
 theme: terminal
 paginate: 5
 
+sitemap:
+  changefreq: weekly
+  filename: sitemap.xml
+  priority: 0.5
+
 params:
   # dir name of your blog content (default is `content/posts`)
   contentTypeName: posts

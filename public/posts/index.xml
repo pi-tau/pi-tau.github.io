@@ -1,37 +1,1113 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Posts on SITE TITLE</title>
+    <title>Posts on pi-tau</title>
     <link>/posts/</link>
-    <description>Recent content in Posts on SITE TITLE</description>
+    <description>Recent content in Posts on pi-tau</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en</language>
-    <lastBuildDate>Wed, 28 Jun 2023 00:00:00 +0000</lastBuildDate><atom:link href="/posts/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Thu, 13 Jul 2023 00:00:00 +0000</lastBuildDate><atom:link href="/posts/index.xml" rel="self" type="application/rss+xml" />
     <item>
-      <title>My First Post</title>
-      <link>/posts/my-first-post/</link>
-      <pubDate>Wed, 28 Jun 2023 00:00:00 +0000</pubDate>
+      <title>An annotatedER Transformer</title>
+      <link>/posts/transformer/</link>
+      <pubDate>Thu, 13 Jul 2023 00:00:00 +0000</pubDate>
       
-      <guid>/posts/my-first-post/</guid>
-      <description>REINFORCEMENT LEARNING This is some super long sentence that is supposed to be 80 characters just for f This is an even longer sentence that is longer than 80 characters for even more fun yeah yeah yeah
-INTRODUCTION This is super cool
-END The End</description>
-      <content>&lt;h1 id=&#34;reinforcement-learning&#34;&gt;REINFORCEMENT LEARNING&lt;/h1&gt;
-&lt;p&gt;This is some super long sentence that is supposed to be 80 characters just for f
-This is an even longer sentence that is longer than 80 characters for even more fun yeah yeah yeah&lt;/p&gt;
-&lt;h2 id=&#34;introduction&#34;&gt;INTRODUCTION&lt;/h2&gt;
-&lt;p&gt;This is super cool&lt;/p&gt;
-&lt;h2 id=&#34;end&#34;&gt;END&lt;/h2&gt;
+      <guid>/posts/transformer/</guid>
+      <description>This post is based on the The annotated transformer and its older version. I decided to add some more annotations regarding the architecture of the transformer model1 and why some specific design choices were made.
+But first, a longer explanation about the attention layer in the transformer&amp;hellip; Skip to the code if you don&amp;rsquo;t feel like reading text. Also check out github.
+ATTENTION What this layer does is it takes a sequence of elements $x_1, x_2, \dots, x_T$ and for every element $x_i$ produces an encoding $z_i$, that captures somehow the context of $x_i$, i.</description>
+      <content>&lt;p&gt;This post is based on the
+&lt;em&gt;&lt;a href=&#34;http://nlp.seas.harvard.edu/annotated-transformer/&#34;&gt;The annotated transformer&lt;/a&gt;&lt;/em&gt;
+and its &lt;a href=&#34;http://nlp.seas.harvard.edu/2018/04/03/attention.html&#34;&gt;older version&lt;/a&gt;.
+I decided to add some more annotations regarding the architecture of the
+transformer model&lt;sup id=&#34;fnref:1&#34;&gt;&lt;a href=&#34;#fn:1&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;1&lt;/a&gt;&lt;/sup&gt; and why some specific design choices were made.&lt;/p&gt;
+&lt;p&gt;But first, a longer explanation about the attention layer in the transformer&amp;hellip;
+&lt;a href=&#34;#multi-head-attention-layer&#34;&gt;Skip to the code&lt;/a&gt; if you don&amp;rsquo;t feel like reading
+text. Also check out &lt;a href=&#34;https://github.com/pi-tau/transformer&#34;&gt;github&lt;/a&gt;.&lt;/p&gt;
+&lt;h1 id=&#34;attention&#34;&gt;ATTENTION&lt;/h1&gt;
+&lt;p&gt;What this layer does is it takes a sequence of elements $x_1, x_2, \dots, x_T$
+and for every element $x_i$ produces an encoding $z_i$, that captures somehow
+the context of $x_i$, i.e., it is coupled with all other elements of the
+sequence. This operation is similar to the workings of an RNN, but the unrolling
+of an RNN is sequential and cannot be parallelized.&lt;/p&gt;
+&lt;p&gt;What we want to do is compute the encoding of $x_i$ independently, something
+like: $z_i = x_i W $, where $W$ is the encoding matrix. However, now $z_i$ is
+completely decoupled from the other sequence elements. The idea of the
+self-attention layer is to compute these &lt;em&gt;independent&lt;/em&gt; encodings and then
+combine them. For every $x_i$ we compute a so called &lt;em&gt;value encoding&lt;/em&gt;
+$v_i = x_i V$, and the final encoding $z_i$ is a weighted average of the
+value encodings of all the sequence elements:&lt;/p&gt;
+&lt;p&gt;$$ \displaystyle z_i = \sum_j \alpha_j v_j, $$&lt;/p&gt;
+&lt;p&gt;where $\alpha_j$ are the weights for the element $i$. But what should the values
+of those weights be? Well, we want to have a high value of $\alpha_j$ if element
+$i$ is closely realated to element $j$, i.e., element $i$ should
+&lt;em&gt;&amp;ldquo;pay attention&amp;rdquo;&lt;/em&gt; to element $j$.&lt;/p&gt;
+&lt;p&gt;But we already have a proximity measure for vectors &amp;ndash; we can simply take the
+scalar product: $\alpha_j = x_i x_j^{T}$. However, this implies that the
+attention score between $x_i$ and $x_j$ will be the same as the attention score
+between $x_j$ and $x_i$. Instead, we can take the attention score to be:
+$\alpha_j = x_i W x_j^{T}$, where $W$ is yet another encoding matrix. Now $x_i$
+might pay a lot of attention to $x_j$, while the inverse does not need to be
+true. We go even a step further and define this encoding matrix as a product
+between two matrices, $W = Q K^{T}$. The attention score now becomes:&lt;/p&gt;
+&lt;p&gt;$$ \alpha_j = x_i Q K^{T} x_j^{T}. $$&lt;/p&gt;
+&lt;p&gt;We call the vector $q_i = x_i Q$ the &lt;em&gt;query encoding&lt;/em&gt; of $x_i$, and the vector
+$k_j = x_j K$ the &lt;em&gt;key encoding&lt;/em&gt; of $x_j$. All three matrices $Q, K, V$ are
+learnable parameters of the attention layer.&lt;/p&gt;
+&lt;p&gt;The weights for the weighted summation are obtained by simply applying a softmax
+on the attention scores. For the encodings $z_i$ we get:&lt;/p&gt;
+&lt;p&gt;$$ z_i = \text{softmax}(x_i Q K^T x^T) x V $$&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/transformer/attention.png&#34; alt=&#34;Attention&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;Scaled dot-product attention&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;p&gt;The attention score $\alpha_j = q_i k_j^{T}$ will be high for keys that match the
+query $q_i$, and will be low for keys that do not match. What we are hoping to
+achieve is for our model to learn to map queries and their matching keys nearby
+in the embedding space.&lt;/p&gt;
+&lt;p&gt;Continuing the &lt;em&gt;query-key-value&lt;/em&gt; analogy, we can think of the attention layer as
+a &lt;strong&gt;soft&lt;/strong&gt; lookup in a key-value store. In standard lookup tables the query
+matches one of the keys and the corresponding value is returned. In the soft
+lookup table the query matches &lt;em&gt;all&lt;/em&gt; the keys softly, to a weight between 0 and 1.
+The values are then multiplied by the corresponding weights and summed to
+produce the output. In the &lt;em&gt;self-attention layer&lt;/em&gt; the key-value store is built
+from the elements of the sequence, and then every element is matched with all
+the rest. In the &lt;em&gt;cross-attention layer&lt;/em&gt; (used in the decoder) the key-value
+store is built from the source sequence processed by the encoder. Then every
+element from the target sequence is decoded by querying this key-value store
+like a memory database.&lt;/p&gt;
+&lt;!-- raw HTML omitted --&gt;
+&lt;h1 id=&#34;multi-head-attention-layer&#34;&gt;MULTI-HEAD ATTENTION LAYER&lt;/h1&gt;
+&lt;p&gt;One problem with the proposed self-attention mechanism is that an output $z_i$
+will most likely be dominated by a single $v_i$, because the softmax quickly
+saturates. In order to have our $z_i$ &amp;ldquo;pay attention&amp;rdquo; to multiple $v_i$s we
+will use several sets of $Q$, $K$, and $V$ matrices. Each set is called an
+&lt;em&gt;attention head&lt;/em&gt;, and the outputs of all the heads are concatenated at the end.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;MultiHeadAttention&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(self, in_dim, qk_dim, v_dim, out_dim, n_heads, attn_dropout&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;0.&lt;/span&gt;):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        super()&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;__init__()
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;n_heads &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; n_heads
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;dropout_p &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; attn_dropout
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Q &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Linear(in_dim, qk_dim, bias&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;False&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;K &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Linear(in_dim, qk_dim, bias&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;False&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;V &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Linear(in_dim, v_dim, bias&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;False&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Wo &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Linear(v_dim, out_dim)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;attn_dropout &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Dropout(attn_dropout)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;init&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;normal_(self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Q&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;weight, std&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;np&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;sqrt(&lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt; &lt;span style=&#34;color:#f92672&#34;&gt;/&lt;/span&gt; (in_dim &lt;span style=&#34;color:#f92672&#34;&gt;+&lt;/span&gt; qk_dim&lt;span style=&#34;color:#f92672&#34;&gt;//&lt;/span&gt;n_heads)))
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;init&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;normal_(self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;K&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;weight, std&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;np&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;sqrt(&lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt; &lt;span style=&#34;color:#f92672&#34;&gt;/&lt;/span&gt; (in_dim &lt;span style=&#34;color:#f92672&#34;&gt;+&lt;/span&gt; qk_dim&lt;span style=&#34;color:#f92672&#34;&gt;//&lt;/span&gt;n_heads)))
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;init&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;zeros_(self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Wo&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;bias)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The initializer of the layer accepts the dimensionalities of the query, key and
+value spaces, and the number of heads. Note that the query and key must be in
+the same space in order to perform the dot product between the two. That is why
+a single parameter is provided for both.&lt;/p&gt;
+&lt;p&gt;In order not to increase the complexity of the model (i.e., number of params)
+when adding additional heads, the dimensionality of each head will be equal to
+the original dimensionality divided by the number of heads. Now, instead of
+defining the $Q$, $K$, $V$ layers for each head separately, we will define them
+once and split the result into separate heads later.&lt;/p&gt;
+&lt;p&gt;After the outputs of the heads are concatenated we will forward them through a
+final linear layer ($W_O$) in order to project them in the required output
+dimension.&lt;/p&gt;
+&lt;p&gt;Usually, for the transformer model we will initialize this layer as:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;attn_layer &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; MultiHeadAttention(d, d, d, d, h)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;which means that the output space will be the same as the input space, and the
+queries, keys and values will be projected by each head into a
+$(d//h)$-dimensional space.&lt;/p&gt;
+&lt;p&gt;Finally, we will specifically initialize the weights of the $Q$ and $K$ layers
+to be from a unit normal distribution with an std of
+$\sqrt{\frac{2}{\text{fan_in}+\text{fan_out}}}$, so that forwarding through
+these layers keeps the variance unchanged. Note that for $\text{fan_out}$ we use
+the per-head dimension, although I don&amp;rsquo;t think that this is all that important.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;MultiHeadAttention&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(self, in_dim, qk_dim, v_dim, out_dim, n_heads, attn_dropout):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#75715e&#34;&gt;# ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;forward&lt;/span&gt;(self, queries, keys, values, mask&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        B, T, _ &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; queries&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;shape
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        _, Ts, _ &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; keys&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;shape
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;if&lt;/span&gt; mask &lt;span style=&#34;color:#f92672&#34;&gt;is&lt;/span&gt; &lt;span style=&#34;color:#f92672&#34;&gt;not&lt;/span&gt; &lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;: &lt;span style=&#34;color:#75715e&#34;&gt;# unsqueeze the mask to account for the head dim&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            mask &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; mask&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;unsqueeze(dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        q &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Q(queries)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;view(B, T, self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;n_heads, &lt;span style=&#34;color:#f92672&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;transpose(&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;) &lt;span style=&#34;color:#75715e&#34;&gt;# X @ Q&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        k &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;K(keys)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;view(B, Ts, self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;n_heads, &lt;span style=&#34;color:#f92672&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;transpose(&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;)   &lt;span style=&#34;color:#75715e&#34;&gt;# X @ K&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        v &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;V(values)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;view(B, Ts, self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;n_heads, &lt;span style=&#34;color:#f92672&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;transpose(&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;) &lt;span style=&#34;color:#75715e&#34;&gt;# X @ V&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        attn &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;matmul(q, k&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;transpose(&lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;3&lt;/span&gt;)) &lt;span style=&#34;color:#75715e&#34;&gt;# XQ @ (XK)^T&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        dk &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; k&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;shape[&lt;span style=&#34;color:#f92672&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        attn &lt;span style=&#34;color:#f92672&#34;&gt;/=&lt;/span&gt;  np&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;sqrt(dk)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;if&lt;/span&gt; mask &lt;span style=&#34;color:#f92672&#34;&gt;is&lt;/span&gt; &lt;span style=&#34;color:#f92672&#34;&gt;not&lt;/span&gt; &lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            attn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;masked_fill_(&lt;span style=&#34;color:#f92672&#34;&gt;~&lt;/span&gt;mask, &lt;span style=&#34;color:#f92672&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1e9&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        attn &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;softmax(attn, dim&lt;span style=&#34;color:#f92672&#34;&gt;=-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;)  &lt;span style=&#34;color:#75715e&#34;&gt;# shape (B, nh, T, Ts)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        attn &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;attn_dropout(attn)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        z &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;matmul(attn, v)           &lt;span style=&#34;color:#75715e&#34;&gt;# shape (B, nh, T, hid)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        z &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; z&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;transpose(&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;reshape(B, T, &lt;span style=&#34;color:#f92672&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        out &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Wo(z)                    &lt;span style=&#34;color:#75715e&#34;&gt;# shape (B, T, out_dims)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;return&lt;/span&gt; out, attn
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The forward pass accepts three different inputs, namely &lt;code&gt;queries&lt;/code&gt;, &lt;code&gt;keys&lt;/code&gt; and
+&lt;code&gt;values&lt;/code&gt;. The usual way to call the self-attention layer is:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;z, _ &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; attn_layer(x, x, x)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;This will perform the self-attention operation described earlier. However, in
+some cases, e.g. in the decoder cross-attention layer, we want to compute our
+&lt;em&gt;key embeddings&lt;/em&gt; and &lt;em&gt;value embeddings&lt;/em&gt; not from $x$, but from a different
+sequence.&lt;/p&gt;
+&lt;p&gt;The forward pass is fairly straight forward. We first compute our query, key and
+value embeddings and then split them into separate heads. Then we calculate the
+attention scores and apply softmax to get the attention weights (probabilities).
+Before applying the softmax layer, however, we scale the scores by dividing by
+the dimensionality of the key embedding space. To see why this is done let&amp;rsquo;s
+assume that the keys and queries have zero mean and unit std. Then for the
+variance of the attention score between any query and key we get:&lt;/p&gt;
+&lt;p&gt;$$ \alpha = q_i k_j^T = \sum_{n=1}^{d_k} q_{in} k_{jn} $$
+$$ \text{Var}(\alpha) = d_k $$&lt;/p&gt;
+&lt;p&gt;Applying softmax on the attention scores with such high variance will result in
+all of the weight being placed on one random element, while all the other
+elements will have a weight of zero. Thus, in order to have the attention scores
+with unit std, we scale by $\sqrt{d_k}$.&lt;/p&gt;
+&lt;p&gt;But is it safe to assume that our keys and queries have unit variance? Well, yes!
+The embeddings are computed by forwarding the input $x$ through the key and
+query layers. We can assume that the input already has unit variance by using
+a normalizing layer (e.g. LayerNorm), and the weights of the layers were
+initialized so that variance is preserved.&lt;/p&gt;
+&lt;p&gt;It looks strange that we are applying dropout directly to the attention
+probabilities just before performing the weighted summation. This means that our
+attention vector will most probably not sum to 1. The paper never mentions or
+explains this but it is used in the official implementation, including BERT and
+GPT. However, note that during evaluation dropout is not applied so we are
+probably fine.&lt;/p&gt;
+&lt;p&gt;One final detail is the application of a mask over the attention scores. One
+reason why this is done because the input to the attention layer is a batch of
+sequences, and not all sequences in the batch have the same length. Shorter
+sequences are padded, and the padded elements need to be masked so that they
+don&amp;rsquo;t take part in the attention score computation. In this case the mask is
+of shape $B \times T \times T$ and is different for every sequence of the batch.
+Another reason is for performing causal masking during decoding.&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/transformer/mask.png&#34; alt=&#34;Mask&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;Masking a batch of padded sequences. A value of
+True indicates that the element **should** take part in the computation&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;p&gt;So why do we need both $Q$ and $K$ if we only ever use them in the form $Q K^{T}$ ?
+Except for making the &lt;em&gt;query-key-value&lt;/em&gt; analogy more clear, is there any other
+reason to keep both matrices? We could just learn the product matrix $W = Q K^{T}$ ?&lt;/p&gt;
+&lt;p&gt;Well, yes, there is a reason.&lt;/p&gt;
+&lt;p&gt;If we were to learn only the product matrix then its size would be $D \times D$,
+while learning two separate matrices allows us to project into a
+lower-dimensional query-key space and now the size of each of the two matrices is
+$D \times d_k$, with $d_k &amp;laquo; D$. Thus, we force the matrix $W = Q K^{T}$ to be
+not just any matrix, but a matrix with rank $d_k$.&lt;/p&gt;
+&lt;p&gt;Is this a reasonable thing to do?&lt;/p&gt;
+&lt;p&gt;Well, yes, it is.&lt;/p&gt;
+&lt;p&gt;Query and key embeddings don&amp;rsquo;t have to be in the large $D$-dimensional space.
+A smaller space could easily do the job, and it would prevent the model from
+overfitting.&lt;/p&gt;
+&lt;h1 id=&#34;encoder-block&#34;&gt;ENCODER BLOCK&lt;/h1&gt;
+&lt;p&gt;The encoder is a stack of $N$ identical blocks applied one after another. Each
+encoder block has a self-attention layer followed by a position-wise
+fully-connected network. Dropout is applied after each of the sub-layers followed
+by residual connection. The model also uses layer normalization.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;EncoderBlock&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(self, d_model, n_heads, dim_mlp, dropout):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        super()&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;__init__()
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;attn &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; MultiHeadAttention(
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            in_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model, qk_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model, v_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model, out_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            n_heads&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;n_heads, attn_dropout&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;dropout,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        )
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;attn_dropout &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Dropout(dropout)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;attn_norm &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;LayerNorm(d_model)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Sequential(
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Linear(d_model, dim_mlp), nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;ReLU(), nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Linear(dim_mlp, d_model),
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        )
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp_dropout &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Dropout(dropout)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp_norm &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;LayerNorm(d_model)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The initializer of the encoder block accepts the dimensionality of the model and
+the number of attention heads and defines all sub layers to produce outputs with
+the same dimension $d_{model}$ in order to facilitate the use of residual
+connections.&lt;/p&gt;
+&lt;p&gt;The residual connection is applied after both the self-attention and the
+fully-connected layers and its purpose is twofold:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Similar to ResNets, this residual connection allows us to continuously
+improve model performance by stacking more encoder blocks. If a deeper model
+wants to reproduce a shallower model, then we simply have to learn that the
+residual is $f(x)=0$.&lt;/li&gt;
+&lt;li&gt;However, more importantly, the residual connection preserves the positional
+information within the sequence. Without it this information would be lost after
+the first self-attention layer. Now each self-attention layer would have to
+learn this information based just on the input features, which is highly
+unlikely.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Another subtlety is the use of fully-connected network. Since there are no
+elementwise non-linearities in the self-attention layer, stacking more
+self-attention layers would just re-average the value vectors. Thus, a small
+neural net is added after each self-attention layer to post-process each output
+vector separately. Usually this network is a two-layer MLP with inner
+dimensionality $\sim 2-8 \times d_{model}$. A wider shallow network allows for
+faster parallelizable execution than a deeper narrow network.&lt;/p&gt;
+&lt;p&gt;Why use an MLP, and not some other type of layer?&lt;/p&gt;
+&lt;p&gt;In the &lt;a href=&#34;https://arxiv.org/abs/1905.09263&#34;&gt;paper&lt;/a&gt;&lt;sup id=&#34;fnref:2&#34;&gt;&lt;a href=&#34;#fn:2&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;2&lt;/a&gt;&lt;/sup&gt; &lt;em&gt;&amp;ldquo;FastSpeech: fast,
+robust and controllable text to speech&amp;rdquo;&lt;/em&gt; by Ren et al., in their FFT block they
+use two convolutional layers instead. The motivation is that the adjacent
+embeddings are more closely related in the character/phoneme sequence in speech
+tasks, than in a word sequence.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;EncoderBlock&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(self, d_model, n_heads, dim_mlp, dropout):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#75715e&#34;&gt;# ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;forward&lt;/span&gt;(self, x, mask&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;if&lt;/span&gt; mask &lt;span style=&#34;color:#f92672&#34;&gt;is&lt;/span&gt; &lt;span style=&#34;color:#f92672&#34;&gt;not&lt;/span&gt; &lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;: mask &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; mask&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;unsqueeze(dim&lt;span style=&#34;color:#f92672&#34;&gt;=-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        x &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;attn_norm(x)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        z, _ &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;attn(x, x, x, mask&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;mask)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        z &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; x &lt;span style=&#34;color:#f92672&#34;&gt;+&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;attn_dropout(z)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        z &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp_norm(z)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        r &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp(z)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        r &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; z &lt;span style=&#34;color:#f92672&#34;&gt;+&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp_dropout(r)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;return&lt;/span&gt; r
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The forward pass accepts the input sequence of shape $B \times T \times d_{model}$
+and an optional mask tensor of shape $B \times T$ that indicates which elements
+of the input should be take part in the computation.&lt;/p&gt;
+&lt;p&gt;Note that our attention layer expects the mask to be of shape
+$B \times T \times T$. Simply broadcasting would not produce the exact same mask
+that we described earlier. However, it achieves the same effect since we don&amp;rsquo;t
+really care what the padded elements are attending.&lt;/p&gt;
+&lt;p&gt;The block also incorporates a layer normalization layer, which also plays a
+very important role, making sure that inputs to the self-attention layer are
+normalized with zero mean and unit variance. There are two options for the
+position of the normalization layer. In the original paper it is placed after
+the residual connection, but more recent implementations re-arrange the layers
+and place it in the beginning of the block. Recent research&lt;sup id=&#34;fnref:3&#34;&gt;&lt;a href=&#34;#fn:3&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;3&lt;/a&gt;&lt;/sup&gt; suggests
+that when using this &amp;ldquo;Pre-LayerNorm&amp;rdquo; configuration we can train the model
+without the warm-up stage of the optimizer.&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/transformer/encoder.png&#34; alt=&#34;Encoder&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;Standard transformer encoder block (left)
+and &amp;#39;Pre-LayerNorm&amp;#39; transformer encoder block (right)&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;p&gt;In this implementation we use the Pre-LN configuration, but note that now the
+final outputs of the encoder stack will not be normalized. To fix this we will
+add an additional LayerNorm layer after the final encoder block in the encoder
+stack.&lt;/p&gt;
+&lt;h1 id=&#34;decoder-block&#34;&gt;DECODER BLOCK&lt;/h1&gt;
+&lt;p&gt;The decoder is a stack of $M$ identical blocks applied one after another.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;DecoderBlock&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(self, d_model, n_heads, dim_mlp, dropout):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        super()&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;__init__()
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;self_attn &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; MultiHeadAttention(
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            in_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model, qk_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model, v_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model, oug_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            n_heads&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;n_heads, attn_dropout&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;dropout,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        )
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;self_attn_dropout &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Dropout(dropout)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;self_attn_norm &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;LayerNorm(d_model)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;cross_attn &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; MultiHeadAttention(
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            in_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model, qk_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model, v_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model, out_dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;d_model,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            n_heads&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;n_heads, attn_dropout&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;dropout,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        )
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;cross_attn_dropout &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Dropout(dropout)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;cross_attn_norm &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;LayerNorm(d_model)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Sequential(
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Linear(d_model, dim_mlp), nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;ReLU(), nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Linear(dim_mlp, d_model),
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        )
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp_dropout &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Dropout(dropout)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp_norm &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;LayerNorm(d_model)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The decoder block is actually very similar to the encoder block, but with two
+differences:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;The self-attention layer of the decoder is actually &lt;em&gt;masked self-attention&lt;/em&gt;,
+using a &lt;em&gt;causal&lt;/em&gt; mask on the decoded sequence.&lt;/li&gt;
+&lt;li&gt;In addition to the two sub-layers, the decoder uses a third sub-layer, which
+performs cross-attention between the decoded sequence and the outputs of the
+encoder.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;DecoderBlock&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(self, d_model, n_heads, dim_mlp, dropout):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#75715e&#34;&gt;# ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;forward&lt;/span&gt;(self, x, mem, mem_mask&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        _, T, _ &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; x&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;shape
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        causal_mask &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;ones(&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;, T, T, dtype&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;bool)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;tril()&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;to(x&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;device)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        x &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;self_attn_norm(x)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        z, _ &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;self_attn(x, x, x, mask&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;causal_mask)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        z &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; x &lt;span style=&#34;color:#f92672&#34;&gt;+&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;self_attn_dropout(z)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;if&lt;/span&gt; mem_mask &lt;span style=&#34;color:#f92672&#34;&gt;is&lt;/span&gt; &lt;span style=&#34;color:#f92672&#34;&gt;not&lt;/span&gt; &lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;: mem_mask &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; mem_mask&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;unsqueeze(dim&lt;span style=&#34;color:#f92672&#34;&gt;=-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        z &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;cross_attn_norm(z)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        c, _ &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;cross_attn(z, mem, mem, mask&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;mem_mask)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        c &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; z &lt;span style=&#34;color:#f92672&#34;&gt;+&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;cross_attn_dropout(c)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        c &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp_norm(c)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        r &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp(c)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        r &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; c &lt;span style=&#34;color:#f92672&#34;&gt;+&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;mlp_dropout(r)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;return&lt;/span&gt; r
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The forward pass accepts the target sequence of shape
+$B \times T_{tgt} \times d_{model}$ and the encoded source sequence of shape
+$B \times T_{src} \times d_{model}$.&lt;/p&gt;
+&lt;p&gt;The self attention layer operates on the target sequence using a
+lower-triangular boolean mask to prevent current elements from attending future
+elements. Since the target sequence is already masked with a causal mask we
+don&amp;rsquo;t need to  provide any additional masking for it.&lt;/p&gt;
+&lt;p&gt;The cross attention uses the target sequence only for computing the query
+embeddings, and uses the encoded source sequences instead for computing the
+key and value embeddings. Now the key and value embeddings represent a
+memory database which the model queries during decoding.&lt;/p&gt;
+&lt;p&gt;Since the target sequence is attending the encoded source sequence, the
+cross-attention scores matrix for each sequence of the batch (and for each head)
+will be of shape $T_{tgt} \times T_{src}$. An optional mask can be provided for
+the encoded source sequence, which, again, needs to be broadcast to the correct
+shape, meaning that we&amp;rsquo;ll need to unsqueeze along the second dimension, instead
+of the last.&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/transformer/decoder.png&#34; alt=&#34;Decoder&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;Pre-LayerNorm transformer decoder block&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;h1 id=&#34;token-embedding-layer&#34;&gt;TOKEN EMBEDDING LAYER&lt;/h1&gt;
+&lt;p&gt;Note that both the encoder and the decoder layers accept input as sequences
+of vectors, meaning that we can use these layers for any problem where our
+data is already vector-encoded. However, if we want to apply these layers to
+language tasks we need to forward our tokens through an embedding layer, before
+feeding them to the transformer blocks.&lt;/p&gt;
+&lt;p&gt;One additional problem that we need to solve is that of encoding the order of
+the sequence, since the attention layers (and consequently the encoder block)
+are permutation-equivariant and have no notion of order.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;TokenEmbedding&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(self, word_embed_weight, pos_embed_weight, scale, dropout):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        super()&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;__init__()
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        max_len, _ &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; pos_embed_weight&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;shape
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;max_len &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; max_len
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;word_embed_weight &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; word_embed_weight
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;pos_embed_weight &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; pos_embed_weight
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;dropout &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Dropout(dropout)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;register_buffer(&lt;span style=&#34;color:#e6db74&#34;&gt;&amp;#34;positions&amp;#34;&lt;/span&gt;, torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;arange(max_len)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;unsqueeze(dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;0&lt;/span&gt;))
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;register_buffer(&lt;span style=&#34;color:#e6db74&#34;&gt;&amp;#34;scale&amp;#34;&lt;/span&gt;, torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;sqrt(torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;FloatTensor([scale])))
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The initializer will directly accept the word embedding and the positional
+embedding matrices. This flexibility allows us to share the same positional
+embedding matrices for the source and target sequences. The original paper uses
+fixed positional embeddings by concatenating sine and cosine functions of
+different frequencies, so we can pass that as well if we want. However, we will
+be using randomly initialized positional embeddings that will be learned from
+scratch. We could also pass directly learned word embeddings if we want.&lt;/p&gt;
+&lt;p&gt;The paper also briefly mentions that they will be using the same word embeddings
+for both the source and the target sequences. And, in addition, this same
+embedding matrix will be used for the final output layer of the decoder, citing
+previous research done &lt;a href=&#34;https://arxiv.org/abs/1608.05859&#34;&gt;here&lt;/a&gt;&lt;sup id=&#34;fnref:4&#34;&gt;&lt;a href=&#34;#fn:4&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;4&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
+&lt;p&gt;Sharing the same embedding matrix for the source and target sequences makes, of
+course, total sense in some tasks like text summarization or question answering,
+where both sequences share the same vocabulary. But not so much in tasks like
+machine translation, where the vocabularies could be wildly different. Right?
+Well.. It turns out that if you are using a sub-word vocabulary and you are
+translating between english and french, or english and german, then around
+85-90% of the sub-words are shared between the languages (see again [&lt;sup id=&#34;fnref1:4&#34;&gt;&lt;a href=&#34;#fn:4&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;4&lt;/a&gt;&lt;/sup&gt;]).
+So, yeah, maybe in these specific cases it makes sense, but otherwise &amp;ndash; I don&amp;rsquo;t
+think so.&lt;/p&gt;
+&lt;p&gt;(I wonder why nobody reports translating between german and french :?
+Don&amp;rsquo;t sue me!)&lt;/p&gt;
+&lt;p&gt;Regarding sharing the same weight matrix between the target word embeddings and
+the decoder output layer. This reportedly improves model performance (see again
+[&lt;sup id=&#34;fnref2:4&#34;&gt;&lt;a href=&#34;#fn:4&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;4&lt;/a&gt;&lt;/sup&gt;]), but we have to be cautious with the initializations. Note that the
+outputs of the decoder are fed into a softmax layer, which could quickly
+saturate if these numbers have high variance. This means that the decoder output
+layer has to use some variance reduction initialization technique, like Xavier
+init. On the other hand, the embedding layer is essentially a table look-up, and
+so in order to keep variance constant, it should be initialized with zero mean
+and unit std. In addition, we will be summing the word embeddings with the
+positional embeddings, so they should be in the same scale.&lt;/p&gt;
+&lt;p&gt;What we will do is provide an additional scale parameter, which will be used to
+scale the word embeddings before adding them to the positional embeddings.
+Obviously, this scale parameter will depend on the initialization of the word
+embeddings and positional embeddings, whether we use sine and cosine positional
+encoding, whether we add or concatenate, and so on.. The original paper vaguely
+mentions that they are using a scale of $\sqrt{d_{model}}$, but honestly&amp;hellip; no one
+knows why..&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;TokenEmbedding&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(self, word_embed_weight, pos_embed_weight, scale, dropout):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#75715e&#34;&gt;# ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;forward&lt;/span&gt;(self, x):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        _, T &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; x&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;shape
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;if&lt;/span&gt; T &lt;span style=&#34;color:#f92672&#34;&gt;&amp;gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;max_len:
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            &lt;span style=&#34;color:#66d9ef&#34;&gt;raise&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;RuntimeError&lt;/span&gt;(&lt;span style=&#34;color:#e6db74&#34;&gt;&amp;#34;Sequence length exceeds the maximum allowed limit&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        pos &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;positions[:, :T]
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        word_embed &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; F&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;embedding(x, self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;word_embed_weight)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        pos_embed &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; F&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;embedding(pos, self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;pos_embed_weight)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        embed &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; pos_embed &lt;span style=&#34;color:#f92672&#34;&gt;+&lt;/span&gt; word_embed &lt;span style=&#34;color:#f92672&#34;&gt;*&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;scale
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;return&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;dropout(embed)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The forward pass simply passes the tokens and the embedding matrices to a
+pytorch utility function that returns the embeddings. The word embeddings are
+then scaled and added to the positional embeddings. You could concatenate them
+as well, but people mostly just add them.&lt;/p&gt;
+&lt;p&gt;Note that the tensor with positions is registered as a module buffer, so it
+resides on the same device as the model parameters. When calling the forward
+function we don&amp;rsquo;t have to initialize a new tensor and push it to the gpu, but
+we can simply slice the buffer. However, slicing out of bounds on a cuda device
+might throw some very cryptic error messages, so we will explicitly verify that
+we don&amp;rsquo;t exceed the maximum sequence length.&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/transformer/embedding.png&#34; alt=&#34;Embedding&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;An embedding block consisting of word
+embedding and positional embedding&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;h1 id=&#34;transformer&#34;&gt;TRANSFORMER&lt;/h1&gt;
+&lt;p&gt;Finally, let&amp;rsquo;s see how everything connects to construct the transformer model.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;Transformer&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            self, src_vocab_size, tgt_vocab_size, max_seq_len,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            d_model, n_heads, n_enc, n_dec, dim_mlp, dropout,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        ):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        super()&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;__init__()
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        scale &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; np&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;sqrt(d_model)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        pos_embed &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Parameter(torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;randn(max_seq_len, d_model))
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        src_word_embed &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Parameter(torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;randn(src_vocab_size, d_model) &lt;span style=&#34;color:#f92672&#34;&gt;/&lt;/span&gt; scale)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;if&lt;/span&gt; tgt_vocab_size &lt;span style=&#34;color:#f92672&#34;&gt;is&lt;/span&gt; &lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            tgt_word_embed &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; src_word_embed
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;else&lt;/span&gt;:
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            tgt_word_embed &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Parameter(torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;randn(tgt_vocab_size, d_model) &lt;span style=&#34;color:#f92672&#34;&gt;/&lt;/span&gt; scale)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;src_embed &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; TokenEmbedding(src_word_embed, pos_embed, scale, dropout)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;tgt_embed &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; TokenEmbedding(tgt_word_embed, pos_embed, scale, dropout)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;tgt_proj_weight &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; tgt_word_embed
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;encoder_stack &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;ModuleList((
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            EncoderBlock(d_model, n_heads, dim_mlp, dropout) &lt;span style=&#34;color:#66d9ef&#34;&gt;for&lt;/span&gt; _ &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; range(n_enc)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        ))
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;enc_norm &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;LayerNorm(d_model)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;decoder_stack &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;ModuleList((
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            DecoderBlock(d_model, n_heads, dim_mlp, dropout) &lt;span style=&#34;color:#66d9ef&#34;&gt;for&lt;/span&gt; _ &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; range(n_dec)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        ))
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;dec_norm &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;LayerNorm(d_model)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The initializer accepts the size of the source and target vocabularies, and
+initializes word embedding matrices for the source and target sequences. Note
+that the final decoder layer projecting back to the target vocabulary will use
+the same weights as the target word embeddings. No need to transpose the matrix
+because pytorch stores the weights of the linear layers in transposed form.
+The embedding weights are initialized from a normal distribution with zero
+mean and std equal to $1 / \sqrt{d_{model}}$ because of the sharing with the
+final output layer. The word embeddings will be scaled back with a factor of
+$\sqrt{d_{model}}$.&lt;/p&gt;
+&lt;p&gt;The positional embedding weights are initialized from a standard normal and are
+shared between the source and target embedding layers. Note that we need the
+maximum sequence length in order to initialize these embeddings. If the source
+and target sequences share the same vocabulary, then passing &lt;code&gt;None&lt;/code&gt; for the size
+of the target vocabulary will share the same word embedding weights as well.&lt;/p&gt;
+&lt;p&gt;The encoder and decoder stacks use the same settings for initializing the blocks.
+Note that we also initialize two additional LayerNorm layers which are to be
+applied at the end of each stack because of the Pre-LN architecture.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;Transformer&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(self, &lt;span style=&#34;color:#f92672&#34;&gt;...&lt;/span&gt;):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#75715e&#34;&gt;# ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;encode&lt;/span&gt;(self, src, src_mask):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        z &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;src_embed(src)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;for&lt;/span&gt; encoder &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;encoder_stack:
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            z &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; encoder(z, src_mask)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;return&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;enc_norm(z)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;decode&lt;/span&gt;(self, tgt, mem, mem_mask):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        z &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;tgt_embed(tgt)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;for&lt;/span&gt; decoder &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;decoder_stack:
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            z &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; decoder(z, mem, mem_mask)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;return&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;dec_norm(z)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;forward&lt;/span&gt;(self, src, tgt, src_mask&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        mem &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;encode(src, src_mask)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        out &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;decode(tgt, mem, src_mask)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        tgt_scores &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; F&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;linear(out, self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;tgt_proj_weight)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;return&lt;/span&gt; tgt_scores
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The forward pass accepts a source sequence of shape $B \times T_{src}$ and a
+target sequence of shape $B \times T_{tgt}$. An optional mask for the source
+sequence can be provided with the same shape, indicating which elements should
+take part in the calculation. The output will be a tensor of shape
+$B \times T_{dec} \times D_{vocab}$ assigning to each position of the target
+sequence a vector of scores over the target vocabulary. Note that the forward
+pass uses teacher forcing and feeds the decoder the next true token instead of
+the one the model suggests.&lt;/p&gt;
+&lt;p&gt;We first encode the source sequence by running it through the encoder stack.
+An additional LayerNorm layer is applied because of the Pre-LN architecture.
+The target sequence is then forwarded through the decoder stack. The final
+encodings of the source sequence are fed as key-value memory to each of the
+decoder blocks. Again we normalize the decoder output and apply the final
+projection layer to produce scores over the target vocabulary.&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/transformer/transformer.png&#34; alt=&#34;Transformer&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;The architecture of the Transformer model&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;p&gt;Note that we are feeding the final source sequence encodings to each of the
+decoder blocks, which means that each decoder can only query the final, most
+abstract embeddings of the source sequence. Another approach would be to connect
+each encoder block with its corresponding decoder block, much like a U-net. This
+way the decoder blocks lower in the stack would query earlier embeddings, which
+might be carrying useful information. That would require having the same number
+of encoder and decoder blocks in the two stacks, but I think this is the most
+common choice anyway.&lt;/p&gt;
+&lt;p&gt;Of course, you could just go all in and stack the outputs from all of the encoder
+blocks together and feed them to each and every decoder block. You would have to
+forward them through an additional linear layer to reduce the dimensionality
+back to $d_{model}$, or adjust the attention layer to accept key-value memory
+with dimension different from the query dimension. Anyway, I have never seen
+anyone do that and also I just made that up, so maybe don&amp;rsquo;t do it.&lt;/p&gt;
+&lt;h1 id=&#34;sequence-to-sequence&#34;&gt;SEQUENCE-TO-SEQUENCE&lt;/h1&gt;
+&lt;p&gt;In order to generate a sequence during inference we will use a simple greedy
+decoding strategy. (Maybe I will add beam search at some point.)&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;Transformer&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; __init__(self, &lt;span style=&#34;color:#f92672&#34;&gt;...&lt;/span&gt;):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#75715e&#34;&gt;# ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;encode&lt;/span&gt;(self, src, src_mask):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#75715e&#34;&gt;# ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;decode&lt;/span&gt;(self, tgt, mem, mem_mask):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#75715e&#34;&gt;# ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;forward&lt;/span&gt;(self, src, tgt, src_mask&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#75715e&#34;&gt;# ...&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#a6e22e&#34;&gt;@torch.no_grad&lt;/span&gt;()
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;def&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;greedy_decode&lt;/span&gt;(self, src, src_mask, bos_idx, eos_idx, max_len&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;80&lt;/span&gt;):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        B &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; src&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;shape[&lt;span style=&#34;color:#ae81ff&#34;&gt;0&lt;/span&gt;]
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        done &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; {i : &lt;span style=&#34;color:#66d9ef&#34;&gt;False&lt;/span&gt; &lt;span style=&#34;color:#66d9ef&#34;&gt;for&lt;/span&gt; i &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; range(B)}
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        was_training &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;training
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;eval()
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        tgt &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;LongTensor([[bos_idx]] &lt;span style=&#34;color:#f92672&#34;&gt;*&lt;/span&gt; B)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;to(src&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;device)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        mem &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;encode(src, src_mask)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;for&lt;/span&gt; _ &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; range(max_len&lt;span style=&#34;color:#f92672&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            out &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;decode(tgt, mem, mem_mask&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;src_mask)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            scores &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; F&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;linear(out, self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;tgt_proj_weight)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            next_idx &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;max(scores[:, &lt;span style=&#34;color:#f92672&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;:], dim&lt;span style=&#34;color:#f92672&#34;&gt;=-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;indices
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            tgt &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;concat((tgt, next_idx), dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            &lt;span style=&#34;color:#66d9ef&#34;&gt;for&lt;/span&gt; i, idx &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; enumerate(next_idx):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;                &lt;span style=&#34;color:#66d9ef&#34;&gt;if&lt;/span&gt; idx[&lt;span style=&#34;color:#ae81ff&#34;&gt;0&lt;/span&gt;] &lt;span style=&#34;color:#f92672&#34;&gt;==&lt;/span&gt; eos_idx: done[i] &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#66d9ef&#34;&gt;True&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            &lt;span style=&#34;color:#66d9ef&#34;&gt;if&lt;/span&gt; &lt;span style=&#34;color:#66d9ef&#34;&gt;False&lt;/span&gt; &lt;span style=&#34;color:#f92672&#34;&gt;not&lt;/span&gt; &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; done&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;values(): &lt;span style=&#34;color:#66d9ef&#34;&gt;break&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;if&lt;/span&gt; was_training: self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;train()
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;return&lt;/span&gt; tgt
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The decoding function takes as argument the source sequence to be decoded and
+the start and end tokens. We will first encode the source sequence by running it
+through the encoder stack and then we will prompt the decoder with the start
+token to start generating. The decoded sequence will be generated one element at
+a time. At every step of the loop we feed the decoder the entire target sequence
+that has been generated until now. For each element the decoder will output
+scores over the target vocabulary indicating which should be the next element.
+We are only concerned with the scores for the last element of the sequence,
+because they are used to predict the next element. Decoding continues until
+the end token is produced.&lt;/p&gt;
+&lt;p&gt;Since we are decoding a batch of sequences, we need to continue iterating until
+every sequence in the batch has been decoded. To keep track of that we will
+simply update a dict indicating which sequences are done.&lt;/p&gt;
+&lt;p&gt;Note that the provided tokens for beginning of sequence (bos) and end of
+sequence (eos) don&amp;rsquo;t have to be the special &lt;code&gt;&amp;lt;START&amp;gt;&lt;/code&gt; and &lt;code&gt;&amp;lt;END&amp;gt;&lt;/code&gt; tokens. We could
+try to start the sequence with any item from the vocabulary. We could also
+try to end the sequence with any item, but keep in mind that the model was
+trained to end sequences specifically with the &lt;code&gt;&amp;lt;END&amp;gt;&lt;/code&gt; token.&lt;/p&gt;
+&lt;h1 id=&#34;so-does-it-work&#34;&gt;SO? DOES IT WORK?&lt;/h1&gt;
+&lt;p&gt;To quickly test the code we will try to learn a simple task: reversing the order
+of a sequence.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#f92672&#34;&gt;from&lt;/span&gt; torch.nn.utils.rnn &lt;span style=&#34;color:#f92672&#34;&gt;import&lt;/span&gt; pad_sequence
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;device &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;device(&lt;span style=&#34;color:#e6db74&#34;&gt;&amp;#34;cuda&amp;#34;&lt;/span&gt; &lt;span style=&#34;color:#66d9ef&#34;&gt;if&lt;/span&gt; torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;cuda&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;is_available() &lt;span style=&#34;color:#66d9ef&#34;&gt;else&lt;/span&gt; &lt;span style=&#34;color:#e6db74&#34;&gt;&amp;#34;cpu&amp;#34;&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;bos_idx, eos_idx, pad_idx &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;0&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;vocab_size, max_len &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#ae81ff&#34;&gt;100&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;16&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;data_loader &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; data&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;DataLoader(  &lt;span style=&#34;color:#75715e&#34;&gt;# random sequences of different lengths&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    dataset&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;[torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;randint(&lt;span style=&#34;color:#ae81ff&#34;&gt;3&lt;/span&gt;, vocab_size, (randint(max_len&lt;span style=&#34;color:#f92672&#34;&gt;//&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;, max_len),)) &lt;span style=&#34;color:#66d9ef&#34;&gt;for&lt;/span&gt; _ &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; range(&lt;span style=&#34;color:#ae81ff&#34;&gt;50000&lt;/span&gt;)],
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    batch_size&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;128&lt;/span&gt;, shuffle&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;True&lt;/span&gt;, drop_last&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;True&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    collate_fn&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;lambda&lt;/span&gt; batch: (
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        pad_sequence(batch, batch_first&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;True&lt;/span&gt;, padding_value&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;pad_idx),
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        pad_sequence(           &lt;span style=&#34;color:#75715e&#34;&gt;# flip the sequence and add &amp;lt;START&amp;gt; and &amp;lt;END&amp;gt; tags&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            [torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;LongTensor([bos_idx] &lt;span style=&#34;color:#f92672&#34;&gt;+&lt;/span&gt; x&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;flip(&lt;span style=&#34;color:#ae81ff&#34;&gt;0&lt;/span&gt;)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;tolist() &lt;span style=&#34;color:#f92672&#34;&gt;+&lt;/span&gt; [eos_idx]) &lt;span style=&#34;color:#66d9ef&#34;&gt;for&lt;/span&gt; x &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; batch],
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            batch_first&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;True&lt;/span&gt;, padding_value&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;pad_idx,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    )),
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The dataset will consist of 50000 random sequences of numbers with varying
+lengths between 8 and 16 elements. The target sequence is simply the reversed
+sequence nested between &lt;code&gt;&amp;lt;START&amp;gt;&lt;/code&gt; and &lt;code&gt;&amp;lt;END&amp;gt;&lt;/code&gt; tags. The data loader will
+generate random batches from the training set and will automatically pad shorter
+sequences to match the length of the longest sequence in the batch.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;transformer &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; Transformer(
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    src_vocab_size&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;vocab_size, tgt_vocab_size&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;, max_seq_len&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;256&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    d_model&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;64&lt;/span&gt;, n_heads&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;, n_enc&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;, n_dec&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;, dim_mlp&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;128&lt;/span&gt;, dropout&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;0.1&lt;/span&gt;,
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;to(device)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;optim &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;optim&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Adam(transformer&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;parameters(), lr&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1e-3&lt;/span&gt;, weight_decay&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;0.&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;for&lt;/span&gt; _ &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; range(&lt;span style=&#34;color:#ae81ff&#34;&gt;30&lt;/span&gt;):
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;for&lt;/span&gt; src, tgt &lt;span style=&#34;color:#f92672&#34;&gt;in&lt;/span&gt; data_loader:
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        src, tgt &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; src&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;to(device), tgt&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;to(device)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        tgt_in, tgt_out &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; tgt[:, :&lt;span style=&#34;color:#f92672&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;], tgt[:, &lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;:]
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        logits &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; transformer(src, tgt_in, (src &lt;span style=&#34;color:#f92672&#34;&gt;!=&lt;/span&gt; pad_idx))
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        loss &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; F&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;cross_entropy(
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;            logits&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;permute(&lt;span style=&#34;color:#ae81ff&#34;&gt;0&lt;/span&gt;,&lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;,&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;), tgt_out, ignore_index&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;pad_idx)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        optim&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;zero_grad()
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        loss&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;backward()
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;utils&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;clip_grad_norm_(transformer&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;parameters(), &lt;span style=&#34;color:#ae81ff&#34;&gt;1.&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        optim&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;step()
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;We will use a relatively small model for this simple task. Since both the source
+and the target sequences come from the same vocabulary, we will share the word
+embedding matrices by setting &lt;code&gt;tgt_vocab_size=None&lt;/code&gt;. Note that during training
+we feed all but the last element of the target sequence. We don&amp;rsquo;t want to feed
+the &lt;code&gt;&amp;lt;END&amp;gt;&lt;/code&gt; token, we only want the model to predict it. When computing the loss
+we compare the predictions of the model with all but the first element of the
+target sequence.&lt;/p&gt;
+&lt;!-- raw HTML omitted --&gt;
+&lt;!-- raw HTML omitted --&gt;
+&lt;div class=&#34;footnotes&#34; role=&#34;doc-endnotes&#34;&gt;
+&lt;hr&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn:1&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1706.03762&#34;&gt;2017&lt;/a&gt; &amp;ldquo;Attention is all you
+need&amp;rdquo; by Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones,
+Aidan N. Gomez, Lukasz Kaiser, Illia Polosukhin&amp;#160;&lt;a href=&#34;#fnref:1&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:2&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1905.09263&#34;&gt;2019&lt;/a&gt; &amp;ldquo;FastSpeech: fast,
+robust and controllable text to speech&amp;rdquo; by Yi Ren, Yangjun Ruan, Xu Tan,
+Tao Qin, Sheng Zhao, Zhou Zhao, Tie-Yan Liu&amp;#160;&lt;a href=&#34;#fnref:2&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:3&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/2002.04745&#34;&gt;2020&lt;/a&gt; &amp;ldquo;On layer normalization in
+the transformer architecture&amp;rdquo; by Ruibin Xiong, Yunchang Yang, Di He, Kai Zheng,
+Shuxin Zheng, Chen Xing, Huishuai Zhang, Yanyan Lan, Liwei Wang, Tie-Yan Liu&amp;#160;&lt;a href=&#34;#fnref:3&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:4&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1608.05859&#34;&gt;2016&lt;/a&gt; &amp;ldquo;Using the output embeddings
+to improve language models&amp;rdquo; by Ofir Press, Lior Wolf&amp;#160;&lt;a href=&#34;#fnref:4&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&amp;#160;&lt;a href=&#34;#fnref1:4&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&amp;#160;&lt;a href=&#34;#fnref2:4&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+</content>
+    </item>
+    
+    <item>
+      <title>ResNet, ResNeXt, RegNet,... what else?</title>
+      <link>/posts/res-nets/</link>
+      <pubDate>Sat, 01 Jul 2023 00:00:00 +0000</pubDate>
+      
+      <guid>/posts/res-nets/</guid>
+      <description>The ResNet was introduced in the paper1 &amp;ldquo;Deep residual learning for image recognition&amp;rdquo; by Kaiming He et al. in 2015. So what is the problem that its design was trying to solve? My first thought was that it improves gradient flow and allows for easier training of much deeper models, but that&amp;rsquo;s not it. The problem with vanishing/exploding gradients was already solved with techniques like batch normalization2 and smart weight3 initialization4.</description>
+      <content>&lt;p&gt;The ResNet was introduced in the &lt;a href=&#34;https://arxiv.org/abs/1512.03385&#34;&gt;paper&lt;/a&gt;&lt;sup id=&#34;fnref:1&#34;&gt;&lt;a href=&#34;#fn:1&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;1&lt;/a&gt;&lt;/sup&gt;
+&lt;em&gt;&amp;ldquo;Deep residual learning for image recognition&amp;rdquo;&lt;/em&gt; by Kaiming He et al. in 2015.
+So what is the problem that its design was trying to solve? My first thought was
+that it improves gradient flow and allows for easier training of much deeper
+models, but that&amp;rsquo;s not it. The problem with vanishing/exploding gradients was
+already solved with techniques like
+&lt;a href=&#34;https://arxiv.org/abs/1502.03167&#34;&gt;batch normalization&lt;/a&gt;&lt;sup id=&#34;fnref:2&#34;&gt;&lt;a href=&#34;#fn:2&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;2&lt;/a&gt;&lt;/sup&gt; and smart
+&lt;a href=&#34;http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf&#34;&gt;weight&lt;/a&gt;&lt;sup id=&#34;fnref:3&#34;&gt;&lt;a href=&#34;#fn:3&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;3&lt;/a&gt;&lt;/sup&gt;
+&lt;a href=&#34;https://arxiv.org/abs/1502.01852&#34;&gt;initialization&lt;/a&gt;&lt;sup id=&#34;fnref:4&#34;&gt;&lt;a href=&#34;#fn:4&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;4&lt;/a&gt;&lt;/sup&gt;.&lt;/p&gt;
+&lt;p&gt;There is however a more subtle problem with designing deeper networks. And that
+is: &lt;em&gt;How do we know that a deeper network would fit the data better?&lt;/em&gt; And this
+is not about larger models overfitting the data and performing worse. We are
+talking about the accuracy of the model during &lt;strong&gt;training&lt;/strong&gt;. Experiments show
+that performance actually starts to degrade when networks become too deep, as
+shown on the figure:&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/res-nets/training_error.png&#34; alt=&#34;Training error&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;Training a 20-layer and a
+56-layer networks on CIFAR-10. The figure is adapted from [1]&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;p&gt;In theory, the deeper network should be able to learn the function represented
+by the shallower network &amp;ndash; the last 36 layers should simply be reduced to an
+identity mapping. However, it turns out that, using current gradient based
+methods, it is not that easy to make some arbitrary part of a highly non-linear
+network learn to simulate the identity function. Thus, if we simply stack more
+layers, then we might not be able to recover solutions achievable with fewer
+layers. And so it might happen that deeper networks actually have higher
+training error.&lt;/p&gt;
+&lt;p&gt;(Note that we might simply be having issues optimizing the larger model because
+batch norm and weight init are not doing a good job :? But the assumption is
+that they are doing a good job.)&lt;/p&gt;
+&lt;h1 id=&#34;the-residual-block-empowering-deeper-networks&#34;&gt;THE RESIDUAL BLOCK: EMPOWERING DEEPER NETWORKS&lt;/h1&gt;
+&lt;p&gt;Simply stacking one more layer on top of our current model results in applying
+a function $F(x)=f(x)$ to the output of our model $x$. The paper proposes to
+change the wiring of our network by adding a shortcut connection so that
+$F(x)=f(x)+x$. Now if the deeper model wants to reproduce the shallower model we
+simply have to learn that the residual is $f(x)=0$, i.e., push the weights to 0.
+And the hypothesis is that learning $f(x)=0$ should be much easier than learning
+$f(x)=x$.&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/res-nets/residual.png&#34; alt=&#34;Residual&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;Standard feed forward network (left) and a
+network with shortcut connection (right)&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;p&gt;So after every conv layer we add this shortcut connection? Well, they decided to
+add it after every two $3 \times 3$ conv layers, following the design of the VGG
+block. Later experiments performed in [&lt;sup id=&#34;fnref:5&#34;&gt;&lt;a href=&#34;#fn:5&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;5&lt;/a&gt;&lt;/sup&gt;] show that stacking two $3 \times 3$
+conv layers works best.&lt;/p&gt;
+&lt;p&gt;Also, don&amp;rsquo;t forget that we need to add batch normalization and non-linearity
+layers after every convolution. All of these layers combined, together with the
+shortcut connection, make the residual block (shown on the left side of the
+figure below). Note that the second $ReLU$ is applied after adding the shortcut
+connection, otherwise the residual function $f(x)$ would be strictly
+non-negative, while we want it to take values in $(-\infty, \infty)$. Further
+research however showed that this is not the optimal arrangement and for very
+deep networks (100+ layers) gradient flow is improved when the non-linearity is
+applied only to the residual branch. In their
+&lt;a href=&#34;https://arxiv.org/abs/1603.05027&#34;&gt;follow-up paper&lt;/a&gt;&lt;sup id=&#34;fnref:6&#34;&gt;&lt;a href=&#34;#fn:6&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;6&lt;/a&gt;&lt;/sup&gt; the authors propose
+a re-arrangement of the layers addressing this issue while also making the
+residual function $f: \mathcal{R} \rightarrow \mathcal{R}$ (shown on the right
+side of the figure below).&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/res-nets/residual_block.png&#34; alt=&#34;Residual Block&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;Original ResNet block (left) and
+the &amp;#39;Pre-activation&amp;#39; ResNet block (right)&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;h1 id=&#34;the-bottleneck-block-reducing-computational-overhead&#34;&gt;THE BOTTLENECK BLOCK: REDUCING COMPUTATIONAL OVERHEAD&lt;/h1&gt;
+&lt;p&gt;Since training deep networks could be very expensive the original paper proposes
+a so-called &lt;em&gt;&amp;ldquo;bottleneck&amp;rdquo;&lt;/em&gt; block for all models deeper than 50 layers. Instead
+of two $3 \times 3$ layers, a stack of three layers is used: $1 \times 1$,
+$3 \times 3$, $1 \times 1$. The first $1 \times 1$ layer reduces the number of
+channels (usually in half) and the $3 \times 3$ layer is a bottleneck operating
+with the smaller number of input &lt;em&gt;and&lt;/em&gt; output channels. Finally, the second
+$1 \times 1$ layer restores the channels back to the input size. Here, again, we
+have the option of arranging the batch norm and relu layers in the original
+arrangement or in the &amp;lsquo;pre-activation&amp;rsquo; arrangement, although I think that
+&amp;lsquo;pre-activation&amp;rsquo; is more common.&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/res-nets/bottleneck.png&#34; alt=&#34;Bottleneck Block&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;Standard ResNet block (left) and
+the *bottleneck* ResNet block (right)&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;p&gt;Note that the second $1 \times 1$ layer actually serves a dual purpose. In
+addition to up-scaling the channels it is also used to create a micro-network.&lt;/p&gt;
+&lt;p&gt;A single $3 \times 3$ conv layer is a linear filter that applies a linear
+transformation to the input data. In the
+&lt;a href=&#34;https://arxiv.org/abs/1312.4400&#34;&gt;paper&lt;/a&gt;&lt;sup id=&#34;fnref:7&#34;&gt;&lt;a href=&#34;#fn:7&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;7&lt;/a&gt;&lt;/sup&gt; &lt;em&gt;&amp;ldquo;Network in network&amp;rdquo;&lt;/em&gt;, by Lin
+et al. the authors argue that it would be beneficial to replace the single conv
+layer with a &amp;ldquo;micro-network&amp;rdquo; structure acting on the same $3 \times 3$ patch.
+Now, instead of sliding a linear kernel along the image, we will be sliding the
+entire &amp;ldquo;micro-network&amp;rdquo;. Practically, this idea is realized by stacking
+$1 \times 1$ layers on top of the $3 \times 3$ layer. In our case we have one
+$1 \times 1$ layer resulting in a two-layer fully connected micro network.&lt;/p&gt;
+&lt;h1 id=&#34;the-resnext-block-going-wider-instead-deeper&#34;&gt;THE RESNEXT BLOCK: GOING WIDER INSTEAD DEEPER&lt;/h1&gt;
+&lt;p&gt;Using the ResNet block we can create super deep models (think ~1000 layers) and
+now the performance of the model will not degrade. But will it improve? Well,
+no. Stacking more layers will improve performance up to some point and beyond
+that we only get diminishing returns.&lt;/p&gt;
+&lt;p&gt;Another way to improve performance is to go wider instead of deeper. What this
+means is, instead of stacking more layers, we increase the number of channels in
+each of the convolutional layers. This effectively makes our networks learn
+features in higher dimensional spaces. This idea is thoroughly explored in the
+&lt;a href=&#34;https://arxiv.org/abs/1605.07146&#34;&gt;paper&lt;/a&gt;&lt;sup id=&#34;fnref1:5&#34;&gt;&lt;a href=&#34;#fn:5&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;5&lt;/a&gt;&lt;/sup&gt; &lt;em&gt;&amp;ldquo;Wide residual networks&amp;rdquo;&lt;/em&gt; by
+Zagoruyko and Komodakis. A wider network having 50 layers but twice the channels
+in each of these layers outperforms the ResNet-152 on ImageNet.&lt;/p&gt;
+&lt;p&gt;Unfortunately, increasing the number of channels increases the computational
+costs quadratically (not speed! since it&amp;rsquo;s parallelizable). To fix this problem
+the ResNeXt block was proposed in the
+&lt;a href=&#34;https://arxiv.org/abs/1611.05431&#34;&gt;paper&lt;/a&gt;&lt;sup id=&#34;fnref:8&#34;&gt;&lt;a href=&#34;#fn:8&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;8&lt;/a&gt;&lt;/sup&gt; &lt;em&gt;&amp;ldquo;Aggregated residual
+transformations for deep neural networks&amp;rdquo;&lt;/em&gt; by Xie et al. The idea follows the
+&lt;em&gt;split-transform-merge&lt;/em&gt; strategy:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;we first split the channels $C$ of the input into $g$ independent groups;&lt;/li&gt;
+&lt;li&gt;we then apply different convolutional transformations to each of the groups
+producing $g$ outputs, i.e., grouped convolution (supported by DL frameworks);&lt;/li&gt;
+&lt;li&gt;and, finally, we aggregate the results by concatenating.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/res-nets/resnext.png&#34; alt=&#34;ResNeXt block&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;ResNext block full diagram (left)
+and compressed diagram (right)&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;p&gt;The idea of splitting the computation into several groups was inspired by the
+&lt;a href=&#34;https://arxiv.org/abs/1409.4842&#34;&gt;Inception network&lt;/a&gt;&lt;sup id=&#34;fnref:9&#34;&gt;&lt;a href=&#34;#fn:9&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;9&lt;/a&gt;&lt;/sup&gt;. However, instead
+of having every branch perform a different computation (e.g. $3 \times 3$ conv,
+$5 \times 5$ conv, etc.), the ResNeXt block performs the same transformation in
+all branches. This increases modularity and reduces the number of
+hyper-parameters that need to be tuned. Using this approach we greatly reduce
+the computational costs &lt;strong&gt;and&lt;/strong&gt; the number of parameters while still allowing
+for wider networks. Moreover, the authors report that, instead of simply
+creating wider networks, it is better to divide the channels into groups.&lt;/p&gt;
+&lt;p&gt;The downside is that the channels are split into independent groups and no
+information is exchanged between them until the final aggregation operation.
+For this reason we sandwich the grouped convolution between two $1 \times 1$
+conv layers, making the ResNeXt block look a lot like a bottleneck block, but
+for entirely different reasons. In the bottleneck block the $1 \times 1$ conv
+layers are used for reducing and subsequently increasing the channels, thus
+making the $3 \times 3$ conv a bottleneck. Here, however, the $1 \times 1$ conv
+layers are used for intermixing the information along the channels before and
+after applying the grouped convolution. We don&amp;rsquo;t have to reduce the channels and
+have the $3 \times 3$ grouped conv behave like a bottleneck. In fact, the
+results of [&lt;sup id=&#34;fnref:10&#34;&gt;&lt;a href=&#34;#fn:10&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;10&lt;/a&gt;&lt;/sup&gt;] show that both reducing (bottleneck) and increasing
+(inverted bottleneck) channels degrades the performance.&lt;/p&gt;
+&lt;p&gt;At the extreme you could use $g=C$ as proposed in [&lt;sup id=&#34;fnref:11&#34;&gt;&lt;a href=&#34;#fn:11&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;11&lt;/a&gt;&lt;/sup&gt;], which means
+having each group contain only one channel. Combining this with a $1 \times 1$
+convolution afterwards leads to the famous &lt;em&gt;depthwise separable convolution&lt;/em&gt;.
+This combination leads to a separation of spatial and channel mixing, where
+each operation either mixes information across spatial or channel dimension,
+but not both. This approach greatly reduces the number of parameters in the
+model, but may also harm accuracy.&lt;/p&gt;
+&lt;h1 id=&#34;the-architecture-of-the-resnet&#34;&gt;THE ARCHITECTURE OF THE RESNET&lt;/h1&gt;
+&lt;p&gt;So the ResNet is constructed by stacking residual blocks one after another, but
+there are a few subtleties. A typical conv network is divided into stages and
+in each stage several residual blocks are applied, operating on fixed dimensions
+$C \times H \times W$ (note that the shortcut connection requires the input
+and output dimensions to be the same).&lt;/p&gt;
+&lt;p&gt;In earlier architectures (e.g. VGG, Inception) the transition between stages was
+done with the use of pooling layers (MaxPool, AvgPool). Here we take a different
+approach. In every stage the first residual block will be slightly different and
+it will be responsible for downscaling the input. The downscaling in the
+residual branch will be performed by the $3 \times 3$ conv layer by applying the
+filter with a stride of 2. Since we also need to downscale the input in the
+identity branch, this will be performed by adding an additional $1 \times 1$
+conv layer also with stride 2.&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/res-nets/downscale.png&#34; alt=&#34;Downscale ResBlock&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;Standard downscale
+ResBlock (left), Bottleneck downscale ResBlock (middle) and ResNeXt downscale
+block (right)&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;p&gt;Note that if we are using the &amp;lsquo;pre-activation&amp;rsquo; design then in the identity
+branch we need to add a batch norm and a relu layers before the $1 \times 1$
+convolution.&lt;/p&gt;
+&lt;p&gt;The final ResNet architecture consists of stacking ResBlocks, with occasionally
+downscaling the image with Downscale ResBlocks. After that a Global average
+pooling layer is applied as proposed in [&lt;sup id=&#34;fnref1:7&#34;&gt;&lt;a href=&#34;#fn:7&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;7&lt;/a&gt;&lt;/sup&gt;]. The original idea was to have
+the final convolution produce a tensor with the same number of channels as the
+number of classes, each channel corresponding to a confidence map for the given
+class. Replacing FC layers with global average pooling would not be as effective
+if were using linear convolutions instead of micro-networks. Later models,
+however, take a less extreme approach and add one more FC layer to scale the
+output to match the number of classes.&lt;/p&gt;
+&lt;p&gt;The number of stages should be such that the spatial dimensions of the tensor
+are reduced to $\sim 8 \times 8$. For CIFAR-10, for example, we need 3 stages.
+For ImageNet what is done in practice is that the very first convolution is a
+$7 \times 7$ conv layer with stride of 2, scaling the input from
+$224 \times 224$ to $112 \times 112$. Then 4 stages are applied further reducing
+the size to $112 / 2^4 = 7 \times 7$.&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;style&gt;
+        small {
+            font-size: 90%;
+        }
+    &lt;/style&gt;
+    &lt;img src=&#34;/res-nets/resnet.png&#34; alt=&#34;ResNet&#34;&gt;
+    &lt;figcaption&gt;&lt;small&gt;General ResNet architecture for 3x32x32 inputs&lt;/small&gt;&lt;/figcaption&gt;
+  &lt;/figure&gt;
+
+&lt;/p&gt;
+&lt;p&gt;However, we still need to choose the channels for each stage
+$C_1, C_2, C_3, \dots$, the blocks within each stage $B_1, B_2, B_3, \dots$,
+and also the groups within each block (if using ResNeXt blocks)
+$g_1, g_2, g_3, \dots$. Exploring the possible combinations to find the best
+solution is clearly infeasible, but there are a few guiding principles that we
+can use. The paper&lt;sup id=&#34;fnref1:10&#34;&gt;&lt;a href=&#34;#fn:10&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;10&lt;/a&gt;&lt;/sup&gt; &lt;em&gt;&amp;ldquo;Designing network design spaces&amp;rdquo;&lt;/em&gt; by Iliya
+Radosavovic et al. explores what the relation between these parameters should
+be, so that models at any scale would perform well. This lead to the design of
+the RegNet and the following principles:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Do not use any bottleneck.&lt;/li&gt;
+&lt;li&gt;Share the number of groups for all stages, i.e., $g_i = g \quad \forall i$.&lt;/li&gt;
+&lt;li&gt;Increase the number of channels across stages, i.e., $C_{i+1} \geq C_i$.
+In practice channels are usually doubled at every stage, however the authors
+report top performance at $C_{i+1} \approx 2.5 C_i$.&lt;/li&gt;
+&lt;li&gt;Increase the number of blocks in each stage, i.e., $B_{i+1} \geq B_i$, but
+not necessarily in the last stage. The pattern 1:1:3:1 is rather famous for
+networks with four stages.&lt;/li&gt;
+&lt;li&gt;Best performing models are usually around 20 blocks deep in total, and the
+other parameters are used to control the number of FLOPs.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div class=&#34;footnotes&#34; role=&#34;doc-endnotes&#34;&gt;
+&lt;hr&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn:1&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1512.03385&#34;&gt;2015&lt;/a&gt; &amp;ldquo;Deep residual learning for image
+recognition&amp;rdquo; by Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun&amp;#160;&lt;a href=&#34;#fnref:1&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:2&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1502.03167&#34;&gt;2015&lt;/a&gt; &amp;ldquo;Batch normalization: Accelerating
+deep network training by reducing internal covariate shift&amp;rdquo; by Sergey Ioffe,
+Christian Szegedy&amp;#160;&lt;a href=&#34;#fnref:2&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:3&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf&#34;&gt;2011&lt;/a&gt;
+&amp;ldquo;Understanding the difficulty of training deep feedforward neural networks&amp;rdquo; by
+Xavier Glorot and Yoshua Bengio&amp;#160;&lt;a href=&#34;#fnref:3&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:4&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1502.01852&#34;&gt;2015&lt;/a&gt; &amp;ldquo;Delving deep into rectifiers:
+Surpassing human-level performance on ImageNet classification&amp;rdquo; by Kaiming He,
+Xiangyu Zhang, Shaoqing Ren, Jian Sun&amp;#160;&lt;a href=&#34;#fnref:4&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:5&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1605.07146&#34;&gt;2016&lt;/a&gt; &amp;ldquo;Wide residual networks&amp;rdquo; by
+Sergey Zagoruyko and Nikos Komodakis&amp;#160;&lt;a href=&#34;#fnref:5&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&amp;#160;&lt;a href=&#34;#fnref1:5&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:6&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1603.05027&#34;&gt;2016&lt;/a&gt; &amp;ldquo;Identity mappings in deep
+residualnNetworks&amp;rdquo; by Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun&amp;#160;&lt;a href=&#34;#fnref:6&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:7&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1312.4400&#34;&gt;2013&lt;/a&gt; &amp;ldquo;Network in network&amp;rdquo; by Min Lin,
+Qiang Chen, Shuicheng Yan&amp;#160;&lt;a href=&#34;#fnref:7&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&amp;#160;&lt;a href=&#34;#fnref1:7&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:8&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1611.05431&#34;&gt;2016&lt;/a&gt; &amp;ldquo;Aggregated residual
+transformations for deep neural networks&amp;rdquo; by Saining Xie, Ross Girshick,
+Piotr Dollár, Zhuowen Tu, Kaiming He&amp;#160;&lt;a href=&#34;#fnref:8&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:9&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1409.4842&#34;&gt;2014&lt;/a&gt; &amp;ldquo;Going deeper with
+convolutions&amp;rdquo; by Christian Szegedy, Wei Liu, Yangqing Jia, Pierre Sermanet,
+Scott Reed, Dragomir Anguelov, Dumitru Erhan, Vincent Vanhoucke, Andrew Rabinovich&amp;#160;&lt;a href=&#34;#fnref:9&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:10&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/2003.13678&#34;&gt;2020&lt;/a&gt; &amp;ldquo;Designing network design
+spaces&amp;rdquo; by Ilija Radosavovic, Raj Prateek Kosaraju, Ross Girshick, Kaiming He,
+Piotr Dollár&amp;#160;&lt;a href=&#34;#fnref:10&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&amp;#160;&lt;a href=&#34;#fnref1:10&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li id=&#34;fn:11&#34;&gt;
+&lt;p&gt;&lt;a href=&#34;https://arxiv.org/abs/1704.04861&#34;&gt;2017&lt;/a&gt; &amp;ldquo;MobileNets: efficient
+convolutional neural networks for mobile vision application&amp;rdquo; by Andrew G. Howard,
+Menglong Zhu, Bo Chen, Dmitry Kalenichenko, Weijun Wang, Tobias Weyand, Marco
+Andreetto, Hartwig Adam&amp;#160;&lt;a href=&#34;#fnref:11&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+</content>
+    </item>
+    
+    <item>
+      <title>Hello World</title>
+      <link>/posts/hello-world/</link>
+      <pubDate>Fri, 30 Jun 2023 00:00:00 +0000</pubDate>
+      
+      <guid>/posts/hello-world/</guid>
+      <description>MY FIRST BLOG POST Okay, so yeah. I will be starting a blog post. Probably, I will be blogging mostly about stuff connected to computer science and/or machine learning, but we&amp;rsquo;ll see.
+Why?
+Well, I have some ideas that I want to write somewhere, and I am not a big fan of using dead trees for the purpose so&amp;hellip; I also want to take some notes while learning new stuff and it&amp;rsquo;s too much to put as comments in between lines of code, so I figured a blog might be a good idea.</description>
+      <content>&lt;h1 id=&#34;my-first-blog-post&#34;&gt;MY FIRST BLOG POST&lt;/h1&gt;
+&lt;p&gt;Okay, so yeah. I will be starting a blog post. Probably, I will be blogging mostly
+about stuff connected to computer science and/or machine learning, but we&amp;rsquo;ll see.&lt;/p&gt;
+&lt;p&gt;Why?&lt;/p&gt;
+&lt;p&gt;Well, I have some ideas that I want to write somewhere, and I am not a big fan
+of using dead trees for the purpose so&amp;hellip; I also want to take some notes while
+learning new stuff and it&amp;rsquo;s too much to put as comments in between lines of code,
+so I figured a blog might be a good idea.&lt;/p&gt;
+&lt;p&gt;I was also inspired by some people that were comparing working in industry vs
+working in academia. A common theme was that keeping a blog could be distantly
+compared to having a body of research work. Of course you are not at the cutting
+edge of science, but still, depending on how deep you want to dive, a blog post
+might be considered a reasonable research effort.&lt;/p&gt;
+&lt;p&gt;Hopefully, with time, my posts will improve both in quantity and in quality.
+Keeping them sorted by date would definitely help to see how much progress I am
+making.&lt;/p&gt;
 &lt;p&gt;The End&lt;/p&gt;
 </content>
     </item>
     
     <item>
       <title>Simulating a go channel in Go</title>
-      <link>/posts/go-channel/</link>
+      <link>/posts/go-channel-unfinished/</link>
       <pubDate>Wed, 28 Jun 2023 00:00:00 +0000</pubDate>
       
-      <guid>/posts/go-channel/</guid>
+      <guid>/posts/go-channel-unfinished/</guid>
       <description>The interface that we want to support ?
 type BuffChan struct { /* ... */ } func NewBuffChan(size int) *BuffChan func (c *BuffChan) Read() (int, bool) func (c *BuffChan) Write(elem int) func (c *BuffChan) Close() Replicate the functionality of a go channel using primitives from the sync package.</description>
       <content>&lt;p&gt;The interface that we want to support ?&lt;/p&gt;

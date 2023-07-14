@@ -1,6 +1,7 @@
-+++
-title = "About"
-+++
+---
+title: About
+keywords: ["ai", "deep learning", "rl", "generative models", "research"]
+---
 
 # Hey!
 

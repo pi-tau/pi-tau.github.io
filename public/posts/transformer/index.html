@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  
+    <title>An annotatedER Transformer :: pi-tau</title>
+  
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="A blog post about the Transformer model with even more annotations" />
+<meta name="keywords" content="transformer, nlp, deep learning, multi-head attention, implementation details, explained" />
+
+  <meta name="robots" content="noodp" />
+
+<link rel="canonical" href="/posts/transformer/" />
+
+
+
+
+
+
+  
+  
+  
+  
+  
+  <link rel="stylesheet" href="/styles.css">
+
+
+
+
+
+
+
+  <link rel="shortcut icon" href="/img/theme-colors/orange.png">
+  <link rel="apple-touch-icon" href="/img/theme-colors/orange.png">
+
+
+
+<meta name="twitter:card" content="summary" />
+
+
+
+<meta property="og:locale" content="en" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="An annotatedER Transformer">
+<meta property="og:description" content="A blog post about the Transformer model with even more annotations" />
+<meta property="og:url" content="/posts/transformer/" />
+<meta property="og:site_name" content="pi-tau" />
+
+  
+    <meta property="og:image" content="/img/favicon/orange.png">
+  
+
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="627">
+
+
+  <meta property="article:published_time" content="2023-07-13 00:00:00 &#43;0000 UTC" />
+
+
+
+
+
+
+
+
+
+
+
+
+</head>
+<body class="orange">
+
+
+<div class="container headings--one-size">
+
+  <header class="header">
+  <div class="header__inner">
+    <div class="header__logo">
+      <a href="/">
+  <div class="logo">
+    Terminal
+  </div>
+</a>
+
+    </div>
+    
+      <ul class="menu menu--mobile">
+  <li class="menu__trigger">Menu&nbsp;▾</li>
+  <li>
+    <ul class="menu__dropdown">
+      
+        
+          <li><a href="/about">About</a></li>
+        
+      
+        
+          <li><a href="/contact">Contact</a></li>
+        
+      
+        
+          <li><a href="/posts">Posts</a></li>
+        
+      
+      
+    </ul>
+  </li>
+</ul>
+
+    
+    
+  </div>
+  
+    <nav class="navigation-menu">
+  <ul class="navigation-menu__inner menu--desktop">
+    
+      
+        
+          <li><a href="/about" >About</a></li>
+        
+      
+        
+          <li><a href="/contact" >Contact</a></li>
+        
+      
+        
+          <li><a href="/posts" >Posts</a></li>
+        
+      
+      
+    
+  </ul>
+</nav>
+
+  
+</header>
+
+
+  <div class="content">
+    
+
+
+
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script type="text/javascript" id="MathJax-script" async
+src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[', '\\]']],
+        processEscapes: true,
+        processEnvironments: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+      }
+    };
+
+    window.addEventListener('load', (event) => {
+        document.querySelectorAll("mjx-container").forEach(function(x){
+          x.parentElement.classList += 'has-jax'})
+      });
+
+</script>
+
+
+
+<article class="post">
+  <h1 class="post-title">
+    <a href="/posts/transformer/">An annotatedER Transformer</a>
+  </h1>
+  <div class="post-meta"><time class="post-date">2023-07-13</time></div>
+
+  
+  
+
+
+  
+
+  <div class="post-content"><div>
+        <p>This post is based on the
+<em><a href="http://nlp.seas.harvard.edu/annotated-transformer/">The annotated transformer</a></em>
+and its <a href="http://nlp.seas.harvard.edu/2018/04/03/attention.html">older version</a>.
+I decided to add some more annotations regarding the architecture of the
+transformer model<sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup> and why some specific design choices were made.</p>
+<p>But first, a longer explanation about the attention layer in the transformer&hellip;
+<a href="#multi-head-attention-layer">Skip to the code</a> if you don&rsquo;t feel like reading
+text. Also check out <a href="https://github.com/pi-tau/transformer">github</a>.</p>
+<h1 id="attention">ATTENTION<a href="#attention" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<p>What this layer does is it takes a sequence of elements $x_1, x_2, \dots, x_T$
+and for every element $x_i$ produces an encoding $z_i$, that captures somehow
+the context of $x_i$, i.e., it is coupled with all other elements of the
+sequence. This operation is similar to the workings of an RNN, but the unrolling
+of an RNN is sequential and cannot be parallelized.</p>
+<p>What we want to do is compute the encoding of $x_i$ independently, something
+like: $z_i = x_i W $, where $W$ is the encoding matrix. However, now $z_i$ is
+completely decoupled from the other sequence elements. The idea of the
+self-attention layer is to compute these <em>independent</em> encodings and then
+combine them. For every $x_i$ we compute a so called <em>value encoding</em>
+$v_i = x_i V$, and the final encoding $z_i$ is a weighted average of the
+value encodings of all the sequence elements:</p>
+<p>$$ \displaystyle z_i = \sum_j \alpha_j v_j, $$</p>
+<p>where $\alpha_j$ are the weights for the element $i$. But what should the values
+of those weights be? Well, we want to have a high value of $\alpha_j$ if element
+$i$ is closely realated to element $j$, i.e., element $i$ should
+<em>&ldquo;pay attention&rdquo;</em> to element $j$.</p>
+<p>But we already have a proximity measure for vectors &ndash; we can simply take the
+scalar product: $\alpha_j = x_i x_j^{T}$. However, this implies that the
+attention score between $x_i$ and $x_j$ will be the same as the attention score
+between $x_j$ and $x_i$. Instead, we can take the attention score to be:
+$\alpha_j = x_i W x_j^{T}$, where $W$ is yet another encoding matrix. Now $x_i$
+might pay a lot of attention to $x_j$, while the inverse does not need to be
+true. We go even a step further and define this encoding matrix as a product
+between two matrices, $W = Q K^{T}$. The attention score now becomes:</p>
+<p>$$ \alpha_j = x_i Q K^{T} x_j^{T}. $$</p>
+<p>We call the vector $q_i = x_i Q$ the <em>query encoding</em> of $x_i$, and the vector
+$k_j = x_j K$ the <em>key encoding</em> of $x_j$. All three matrices $Q, K, V$ are
+learnable parameters of the attention layer.</p>
+<p>The weights for the weighted summation are obtained by simply applying a softmax
+on the attention scores. For the encodings $z_i$ we get:</p>
+<p>$$ z_i = \text{softmax}(x_i Q K^T x^T) x V $$</p>
+<p>
+  <figure>
+    <style>
+        small {
+            font-size: 90%;
+        }
+    </style>
+    <img src="/transformer/attention.png" alt="Attention">
+    <figcaption><small>Scaled dot-product attention</small></figcaption>
+  </figure>
+
+</p>
+<p>The attention score $\alpha_j = q_i k_j^{T}$ will be high for keys that match the
+query $q_i$, and will be low for keys that do not match. What we are hoping to
+achieve is for our model to learn to map queries and their matching keys nearby
+in the embedding space.</p>
+<p>Continuing the <em>query-key-value</em> analogy, we can think of the attention layer as
+a <strong>soft</strong> lookup in a key-value store. In standard lookup tables the query
+matches one of the keys and the corresponding value is returned. In the soft
+lookup table the query matches <em>all</em> the keys softly, to a weight between 0 and 1.
+The values are then multiplied by the corresponding weights and summed to
+produce the output. In the <em>self-attention layer</em> the key-value store is built
+from the elements of the sequence, and then every element is matched with all
+the rest. In the <em>cross-attention layer</em> (used in the decoder) the key-value
+store is built from the source sequence processed by the encoder. Then every
+element from the target sequence is decoded by querying this key-value store
+like a memory database.</p>
+<!-- raw HTML omitted -->
+<h1 id="multi-head-attention-layer">MULTI-HEAD ATTENTION LAYER<a href="#multi-head-attention-layer" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<p>One problem with the proposed self-attention mechanism is that an output $z_i$
+will most likely be dominated by a single $v_i$, because the softmax quickly
+saturates. In order to have our $z_i$ &ldquo;pay attention&rdquo; to multiple $v_i$s we
+will use several sets of $Q$, $K$, and $V$ matrices. Each set is called an
+<em>attention head</em>, and the outputs of all the heads are concatenated at the end.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MultiHeadAttention</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, in_dim, qk_dim, v_dim, out_dim, n_heads, attn_dropout<span style="color:#f92672">=</span><span style="color:#ae81ff">0.</span>):
+</span></span><span style="display:flex;"><span>        super()<span style="color:#f92672">.</span>__init__()
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>n_heads <span style="color:#f92672">=</span> n_heads
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>dropout_p <span style="color:#f92672">=</span> attn_dropout
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>Q <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Linear(in_dim, qk_dim, bias<span style="color:#f92672">=</span><span style="color:#66d9ef">False</span>)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>K <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Linear(in_dim, qk_dim, bias<span style="color:#f92672">=</span><span style="color:#66d9ef">False</span>)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>V <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Linear(in_dim, v_dim, bias<span style="color:#f92672">=</span><span style="color:#66d9ef">False</span>)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>Wo <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Linear(v_dim, out_dim)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>attn_dropout <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Dropout(attn_dropout)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        nn<span style="color:#f92672">.</span>init<span style="color:#f92672">.</span>normal_(self<span style="color:#f92672">.</span>Q<span style="color:#f92672">.</span>weight, std<span style="color:#f92672">=</span>np<span style="color:#f92672">.</span>sqrt(<span style="color:#ae81ff">2</span> <span style="color:#f92672">/</span> (in_dim <span style="color:#f92672">+</span> qk_dim<span style="color:#f92672">//</span>n_heads)))
+</span></span><span style="display:flex;"><span>        nn<span style="color:#f92672">.</span>init<span style="color:#f92672">.</span>normal_(self<span style="color:#f92672">.</span>K<span style="color:#f92672">.</span>weight, std<span style="color:#f92672">=</span>np<span style="color:#f92672">.</span>sqrt(<span style="color:#ae81ff">2</span> <span style="color:#f92672">/</span> (in_dim <span style="color:#f92672">+</span> qk_dim<span style="color:#f92672">//</span>n_heads)))
+</span></span><span style="display:flex;"><span>        nn<span style="color:#f92672">.</span>init<span style="color:#f92672">.</span>zeros_(self<span style="color:#f92672">.</span>Wo<span style="color:#f92672">.</span>bias)
+</span></span></code></pre></div><p>The initializer of the layer accepts the dimensionalities of the query, key and
+value spaces, and the number of heads. Note that the query and key must be in
+the same space in order to perform the dot product between the two. That is why
+a single parameter is provided for both.</p>
+<p>In order not to increase the complexity of the model (i.e., number of params)
+when adding additional heads, the dimensionality of each head will be equal to
+the original dimensionality divided by the number of heads. Now, instead of
+defining the $Q$, $K$, $V$ layers for each head separately, we will define them
+once and split the result into separate heads later.</p>
+<p>After the outputs of the heads are concatenated we will forward them through a
+final linear layer ($W_O$) in order to project them in the required output
+dimension.</p>
+<p>Usually, for the transformer model we will initialize this layer as:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>attn_layer <span style="color:#f92672">=</span> MultiHeadAttention(d, d, d, d, h)
+</span></span></code></pre></div><p>which means that the output space will be the same as the input space, and the
+queries, keys and values will be projected by each head into a
+$(d//h)$-dimensional space.</p>
+<p>Finally, we will specifically initialize the weights of the $Q$ and $K$ layers
+to be from a unit normal distribution with an std of
+$\sqrt{\frac{2}{\text{fan_in}+\text{fan_out}}}$, so that forwarding through
+these layers keeps the variance unchanged. Note that for $\text{fan_out}$ we use
+the per-head dimension, although I don&rsquo;t think that this is all that important.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MultiHeadAttention</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, in_dim, qk_dim, v_dim, out_dim, n_heads, attn_dropout):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># ...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, queries, keys, values, mask<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>        B, T, _ <span style="color:#f92672">=</span> queries<span style="color:#f92672">.</span>shape
+</span></span><span style="display:flex;"><span>        _, Ts, _ <span style="color:#f92672">=</span> keys<span style="color:#f92672">.</span>shape
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> mask <span style="color:#f92672">is</span> <span style="color:#f92672">not</span> <span style="color:#66d9ef">None</span>: <span style="color:#75715e"># unsqueeze the mask to account for the head dim</span>
+</span></span><span style="display:flex;"><span>            mask <span style="color:#f92672">=</span> mask<span style="color:#f92672">.</span>unsqueeze(dim<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        q <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>Q(queries)<span style="color:#f92672">.</span>view(B, T, self<span style="color:#f92672">.</span>n_heads, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>)<span style="color:#f92672">.</span>transpose(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">2</span>) <span style="color:#75715e"># X @ Q</span>
+</span></span><span style="display:flex;"><span>        k <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>K(keys)<span style="color:#f92672">.</span>view(B, Ts, self<span style="color:#f92672">.</span>n_heads, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>)<span style="color:#f92672">.</span>transpose(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">2</span>)   <span style="color:#75715e"># X @ K</span>
+</span></span><span style="display:flex;"><span>        v <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>V(values)<span style="color:#f92672">.</span>view(B, Ts, self<span style="color:#f92672">.</span>n_heads, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>)<span style="color:#f92672">.</span>transpose(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">2</span>) <span style="color:#75715e"># X @ V</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        attn <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>matmul(q, k<span style="color:#f92672">.</span>transpose(<span style="color:#ae81ff">2</span>, <span style="color:#ae81ff">3</span>)) <span style="color:#75715e"># XQ @ (XK)^T</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        dk <span style="color:#f92672">=</span> k<span style="color:#f92672">.</span>shape[<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>]
+</span></span><span style="display:flex;"><span>        attn <span style="color:#f92672">/=</span>  np<span style="color:#f92672">.</span>sqrt(dk)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> mask <span style="color:#f92672">is</span> <span style="color:#f92672">not</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>            attn<span style="color:#f92672">.</span>masked_fill_(<span style="color:#f92672">~</span>mask, <span style="color:#f92672">-</span><span style="color:#ae81ff">1e9</span>)
+</span></span><span style="display:flex;"><span>        attn <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>softmax(attn, dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>)  <span style="color:#75715e"># shape (B, nh, T, Ts)</span>
+</span></span><span style="display:flex;"><span>        attn <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>attn_dropout(attn)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        z <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>matmul(attn, v)           <span style="color:#75715e"># shape (B, nh, T, hid)</span>
+</span></span><span style="display:flex;"><span>        z <span style="color:#f92672">=</span> z<span style="color:#f92672">.</span>transpose(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">2</span>)<span style="color:#f92672">.</span>reshape(B, T, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>        out <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>Wo(z)                    <span style="color:#75715e"># shape (B, T, out_dims)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> out, attn
+</span></span></code></pre></div><p>The forward pass accepts three different inputs, namely <code>queries</code>, <code>keys</code> and
+<code>values</code>. The usual way to call the self-attention layer is:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>z, _ <span style="color:#f92672">=</span> attn_layer(x, x, x)
+</span></span></code></pre></div><p>This will perform the self-attention operation described earlier. However, in
+some cases, e.g. in the decoder cross-attention layer, we want to compute our
+<em>key embeddings</em> and <em>value embeddings</em> not from $x$, but from a different
+sequence.</p>
+<p>The forward pass is fairly straight forward. We first compute our query, key and
+value embeddings and then split them into separate heads. Then we calculate the
+attention scores and apply softmax to get the attention weights (probabilities).
+Before applying the softmax layer, however, we scale the scores by dividing by
+the dimensionality of the key embedding space. To see why this is done let&rsquo;s
+assume that the keys and queries have zero mean and unit std. Then for the
+variance of the attention score between any query and key we get:</p>
+<p>$$ \alpha = q_i k_j^T = \sum_{n=1}^{d_k} q_{in} k_{jn} $$
+$$ \text{Var}(\alpha) = d_k $$</p>
+<p>Applying softmax on the attention scores with such high variance will result in
+all of the weight being placed on one random element, while all the other
+elements will have a weight of zero. Thus, in order to have the attention scores
+with unit std, we scale by $\sqrt{d_k}$.</p>
+<p>But is it safe to assume that our keys and queries have unit variance? Well, yes!
+The embeddings are computed by forwarding the input $x$ through the key and
+query layers. We can assume that the input already has unit variance by using
+a normalizing layer (e.g. LayerNorm), and the weights of the layers were
+initialized so that variance is preserved.</p>
+<p>It looks strange that we are applying dropout directly to the attention
+probabilities just before performing the weighted summation. This means that our
+attention vector will most probably not sum to 1. The paper never mentions or
+explains this but it is used in the official implementation, including BERT and
+GPT. However, note that during evaluation dropout is not applied so we are
+probably fine.</p>
+<p>One final detail is the application of a mask over the attention scores. One
+reason why this is done because the input to the attention layer is a batch of
+sequences, and not all sequences in the batch have the same length. Shorter
+sequences are padded, and the padded elements need to be masked so that they
+don&rsquo;t take part in the attention score computation. In this case the mask is
+of shape $B \times T \times T$ and is different for every sequence of the batch.
+Another reason is for performing causal masking during decoding.</p>
+<p>
+  <figure>
+    <style>
+        small {
+            font-size: 90%;
+        }
+    </style>
+    <img src="/transformer/mask.png" alt="Mask">
+    <figcaption><small>Masking a batch of padded sequences. A value of
+True indicates that the element **should** take part in the computation</small></figcaption>
+  </figure>
+
+</p>
+<p>So why do we need both $Q$ and $K$ if we only ever use them in the form $Q K^{T}$ ?
+Except for making the <em>query-key-value</em> analogy more clear, is there any other
+reason to keep both matrices? We could just learn the product matrix $W = Q K^{T}$ ?</p>
+<p>Well, yes, there is a reason.</p>
+<p>If we were to learn only the product matrix then its size would be $D \times D$,
+while learning two separate matrices allows us to project into a
+lower-dimensional query-key space and now the size of each of the two matrices is
+$D \times d_k$, with $d_k &laquo; D$. Thus, we force the matrix $W = Q K^{T}$ to be
+not just any matrix, but a matrix with rank $d_k$.</p>
+<p>Is this a reasonable thing to do?</p>
+<p>Well, yes, it is.</p>
+<p>Query and key embeddings don&rsquo;t have to be in the large $D$-dimensional space.
+A smaller space could easily do the job, and it would prevent the model from
+overfitting.</p>
+<h1 id="encoder-block">ENCODER BLOCK<a href="#encoder-block" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<p>The encoder is a stack of $N$ identical blocks applied one after another. Each
+encoder block has a self-attention layer followed by a position-wise
+fully-connected network. Dropout is applied after each of the sub-layers followed
+by residual connection. The model also uses layer normalization.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">EncoderBlock</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, d_model, n_heads, dim_mlp, dropout):
+</span></span><span style="display:flex;"><span>        super()<span style="color:#f92672">.</span>__init__()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>attn <span style="color:#f92672">=</span> MultiHeadAttention(
+</span></span><span style="display:flex;"><span>            in_dim<span style="color:#f92672">=</span>d_model, qk_dim<span style="color:#f92672">=</span>d_model, v_dim<span style="color:#f92672">=</span>d_model, out_dim<span style="color:#f92672">=</span>d_model,
+</span></span><span style="display:flex;"><span>            n_heads<span style="color:#f92672">=</span>n_heads, attn_dropout<span style="color:#f92672">=</span>dropout,
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>attn_dropout <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Dropout(dropout)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>attn_norm <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>LayerNorm(d_model)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>mlp <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Sequential(
+</span></span><span style="display:flex;"><span>            nn<span style="color:#f92672">.</span>Linear(d_model, dim_mlp), nn<span style="color:#f92672">.</span>ReLU(), nn<span style="color:#f92672">.</span>Linear(dim_mlp, d_model),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>mlp_dropout <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Dropout(dropout)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>mlp_norm <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>LayerNorm(d_model)
+</span></span></code></pre></div><p>The initializer of the encoder block accepts the dimensionality of the model and
+the number of attention heads and defines all sub layers to produce outputs with
+the same dimension $d_{model}$ in order to facilitate the use of residual
+connections.</p>
+<p>The residual connection is applied after both the self-attention and the
+fully-connected layers and its purpose is twofold:</p>
+<ol>
+<li>Similar to ResNets, this residual connection allows us to continuously
+improve model performance by stacking more encoder blocks. If a deeper model
+wants to reproduce a shallower model, then we simply have to learn that the
+residual is $f(x)=0$.</li>
+<li>However, more importantly, the residual connection preserves the positional
+information within the sequence. Without it this information would be lost after
+the first self-attention layer. Now each self-attention layer would have to
+learn this information based just on the input features, which is highly
+unlikely.</li>
+</ol>
+<p>Another subtlety is the use of fully-connected network. Since there are no
+elementwise non-linearities in the self-attention layer, stacking more
+self-attention layers would just re-average the value vectors. Thus, a small
+neural net is added after each self-attention layer to post-process each output
+vector separately. Usually this network is a two-layer MLP with inner
+dimensionality $\sim 2-8 \times d_{model}$. A wider shallow network allows for
+faster parallelizable execution than a deeper narrow network.</p>
+<p>Why use an MLP, and not some other type of layer?</p>
+<p>In the <a href="https://arxiv.org/abs/1905.09263">paper</a><sup id="fnref:2"><a href="#fn:2" class="footnote-ref" role="doc-noteref">2</a></sup> <em>&ldquo;FastSpeech: fast,
+robust and controllable text to speech&rdquo;</em> by Ren et al., in their FFT block they
+use two convolutional layers instead. The motivation is that the adjacent
+embeddings are more closely related in the character/phoneme sequence in speech
+tasks, than in a word sequence.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">EncoderBlock</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, d_model, n_heads, dim_mlp, dropout):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># ...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, x, mask<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> mask <span style="color:#f92672">is</span> <span style="color:#f92672">not</span> <span style="color:#66d9ef">None</span>: mask <span style="color:#f92672">=</span> mask<span style="color:#f92672">.</span>unsqueeze(dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>        x <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>attn_norm(x)
+</span></span><span style="display:flex;"><span>        z, _ <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>attn(x, x, x, mask<span style="color:#f92672">=</span>mask)
+</span></span><span style="display:flex;"><span>        z <span style="color:#f92672">=</span> x <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>attn_dropout(z)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        z <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>mlp_norm(z)
+</span></span><span style="display:flex;"><span>        r <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>mlp(z)
+</span></span><span style="display:flex;"><span>        r <span style="color:#f92672">=</span> z <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>mlp_dropout(r)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> r
+</span></span></code></pre></div><p>The forward pass accepts the input sequence of shape $B \times T \times d_{model}$
+and an optional mask tensor of shape $B \times T$ that indicates which elements
+of the input should be take part in the computation.</p>
+<p>Note that our attention layer expects the mask to be of shape
+$B \times T \times T$. Simply broadcasting would not produce the exact same mask
+that we described earlier. However, it achieves the same effect since we don&rsquo;t
+really care what the padded elements are attending.</p>
+<p>The block also incorporates a layer normalization layer, which also plays a
+very important role, making sure that inputs to the self-attention layer are
+normalized with zero mean and unit variance. There are two options for the
+position of the normalization layer. In the original paper it is placed after
+the residual connection, but more recent implementations re-arrange the layers
+and place it in the beginning of the block. Recent research<sup id="fnref:3"><a href="#fn:3" class="footnote-ref" role="doc-noteref">3</a></sup> suggests
+that when using this &ldquo;Pre-LayerNorm&rdquo; configuration we can train the model
+without the warm-up stage of the optimizer.</p>
+<p>
+  <figure>
+    <style>
+        small {
+            font-size: 90%;
+        }
+    </style>
+    <img src="/transformer/encoder.png" alt="Encoder">
+    <figcaption><small>Standard transformer encoder block (left)
+and &#39;Pre-LayerNorm&#39; transformer encoder block (right)</small></figcaption>
+  </figure>
+
+</p>
+<p>In this implementation we use the Pre-LN configuration, but note that now the
+final outputs of the encoder stack will not be normalized. To fix this we will
+add an additional LayerNorm layer after the final encoder block in the encoder
+stack.</p>
+<h1 id="decoder-block">DECODER BLOCK<a href="#decoder-block" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<p>The decoder is a stack of $M$ identical blocks applied one after another.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DecoderBlock</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, d_model, n_heads, dim_mlp, dropout):
+</span></span><span style="display:flex;"><span>        super()<span style="color:#f92672">.</span>__init__()
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>self_attn <span style="color:#f92672">=</span> MultiHeadAttention(
+</span></span><span style="display:flex;"><span>            in_dim<span style="color:#f92672">=</span>d_model, qk_dim<span style="color:#f92672">=</span>d_model, v_dim<span style="color:#f92672">=</span>d_model, oug_dim<span style="color:#f92672">=</span>d_model,
+</span></span><span style="display:flex;"><span>            n_heads<span style="color:#f92672">=</span>n_heads, attn_dropout<span style="color:#f92672">=</span>dropout,
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>self_attn_dropout <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Dropout(dropout)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>self_attn_norm <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>LayerNorm(d_model)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>cross_attn <span style="color:#f92672">=</span> MultiHeadAttention(
+</span></span><span style="display:flex;"><span>            in_dim<span style="color:#f92672">=</span>d_model, qk_dim<span style="color:#f92672">=</span>d_model, v_dim<span style="color:#f92672">=</span>d_model, out_dim<span style="color:#f92672">=</span>d_model,
+</span></span><span style="display:flex;"><span>            n_heads<span style="color:#f92672">=</span>n_heads, attn_dropout<span style="color:#f92672">=</span>dropout,
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>cross_attn_dropout <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Dropout(dropout)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>cross_attn_norm <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>LayerNorm(d_model)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>mlp <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Sequential(
+</span></span><span style="display:flex;"><span>            nn<span style="color:#f92672">.</span>Linear(d_model, dim_mlp), nn<span style="color:#f92672">.</span>ReLU(), nn<span style="color:#f92672">.</span>Linear(dim_mlp, d_model),
+</span></span><span style="display:flex;"><span>        )
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>mlp_dropout <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Dropout(dropout)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>mlp_norm <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>LayerNorm(d_model)
+</span></span></code></pre></div><p>The decoder block is actually very similar to the encoder block, but with two
+differences:</p>
+<ol>
+<li>The self-attention layer of the decoder is actually <em>masked self-attention</em>,
+using a <em>causal</em> mask on the decoded sequence.</li>
+<li>In addition to the two sub-layers, the decoder uses a third sub-layer, which
+performs cross-attention between the decoded sequence and the outputs of the
+encoder.</li>
+</ol>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DecoderBlock</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, d_model, n_heads, dim_mlp, dropout):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># ...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, x, mem, mem_mask<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>        _, T, _ <span style="color:#f92672">=</span> x<span style="color:#f92672">.</span>shape
+</span></span><span style="display:flex;"><span>        causal_mask <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>ones(<span style="color:#ae81ff">1</span>, T, T, dtype<span style="color:#f92672">=</span>torch<span style="color:#f92672">.</span>bool)<span style="color:#f92672">.</span>tril()<span style="color:#f92672">.</span>to(x<span style="color:#f92672">.</span>device)
+</span></span><span style="display:flex;"><span>        x <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>self_attn_norm(x)
+</span></span><span style="display:flex;"><span>        z, _ <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>self_attn(x, x, x, mask<span style="color:#f92672">=</span>causal_mask)
+</span></span><span style="display:flex;"><span>        z <span style="color:#f92672">=</span> x <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>self_attn_dropout(z)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> mem_mask <span style="color:#f92672">is</span> <span style="color:#f92672">not</span> <span style="color:#66d9ef">None</span>: mem_mask <span style="color:#f92672">=</span> mem_mask<span style="color:#f92672">.</span>unsqueeze(dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">2</span>)
+</span></span><span style="display:flex;"><span>        z <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>cross_attn_norm(z)
+</span></span><span style="display:flex;"><span>        c, _ <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>cross_attn(z, mem, mem, mask<span style="color:#f92672">=</span>mem_mask)
+</span></span><span style="display:flex;"><span>        c <span style="color:#f92672">=</span> z <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>cross_attn_dropout(c)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        c <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>mlp_norm(c)
+</span></span><span style="display:flex;"><span>        r <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>mlp(c)
+</span></span><span style="display:flex;"><span>        r <span style="color:#f92672">=</span> c <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>mlp_dropout(r)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> r
+</span></span></code></pre></div><p>The forward pass accepts the target sequence of shape
+$B \times T_{tgt} \times d_{model}$ and the encoded source sequence of shape
+$B \times T_{src} \times d_{model}$.</p>
+<p>The self attention layer operates on the target sequence using a
+lower-triangular boolean mask to prevent current elements from attending future
+elements. Since the target sequence is already masked with a causal mask we
+don&rsquo;t need to  provide any additional masking for it.</p>
+<p>The cross attention uses the target sequence only for computing the query
+embeddings, and uses the encoded source sequences instead for computing the
+key and value embeddings. Now the key and value embeddings represent a
+memory database which the model queries during decoding.</p>
+<p>Since the target sequence is attending the encoded source sequence, the
+cross-attention scores matrix for each sequence of the batch (and for each head)
+will be of shape $T_{tgt} \times T_{src}$. An optional mask can be provided for
+the encoded source sequence, which, again, needs to be broadcast to the correct
+shape, meaning that we&rsquo;ll need to unsqueeze along the second dimension, instead
+of the last.</p>
+<p>
+  <figure>
+    <style>
+        small {
+            font-size: 90%;
+        }
+    </style>
+    <img src="/transformer/decoder.png" alt="Decoder">
+    <figcaption><small>Pre-LayerNorm transformer decoder block</small></figcaption>
+  </figure>
+
+</p>
+<h1 id="token-embedding-layer">TOKEN EMBEDDING LAYER<a href="#token-embedding-layer" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<p>Note that both the encoder and the decoder layers accept input as sequences
+of vectors, meaning that we can use these layers for any problem where our
+data is already vector-encoded. However, if we want to apply these layers to
+language tasks we need to forward our tokens through an embedding layer, before
+feeding them to the transformer blocks.</p>
+<p>One additional problem that we need to solve is that of encoding the order of
+the sequence, since the attention layers (and consequently the encoder block)
+are permutation-equivariant and have no notion of order.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">TokenEmbedding</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, word_embed_weight, pos_embed_weight, scale, dropout):
+</span></span><span style="display:flex;"><span>        super()<span style="color:#f92672">.</span>__init__()
+</span></span><span style="display:flex;"><span>        max_len, _ <span style="color:#f92672">=</span> pos_embed_weight<span style="color:#f92672">.</span>shape
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>max_len <span style="color:#f92672">=</span> max_len
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>word_embed_weight <span style="color:#f92672">=</span> word_embed_weight
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>pos_embed_weight <span style="color:#f92672">=</span> pos_embed_weight
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>dropout <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Dropout(dropout)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>register_buffer(<span style="color:#e6db74">&#34;positions&#34;</span>, torch<span style="color:#f92672">.</span>arange(max_len)<span style="color:#f92672">.</span>unsqueeze(dim<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>))
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>register_buffer(<span style="color:#e6db74">&#34;scale&#34;</span>, torch<span style="color:#f92672">.</span>sqrt(torch<span style="color:#f92672">.</span>FloatTensor([scale])))
+</span></span></code></pre></div><p>The initializer will directly accept the word embedding and the positional
+embedding matrices. This flexibility allows us to share the same positional
+embedding matrices for the source and target sequences. The original paper uses
+fixed positional embeddings by concatenating sine and cosine functions of
+different frequencies, so we can pass that as well if we want. However, we will
+be using randomly initialized positional embeddings that will be learned from
+scratch. We could also pass directly learned word embeddings if we want.</p>
+<p>The paper also briefly mentions that they will be using the same word embeddings
+for both the source and the target sequences. And, in addition, this same
+embedding matrix will be used for the final output layer of the decoder, citing
+previous research done <a href="https://arxiv.org/abs/1608.05859">here</a><sup id="fnref:4"><a href="#fn:4" class="footnote-ref" role="doc-noteref">4</a></sup>.</p>
+<p>Sharing the same embedding matrix for the source and target sequences makes, of
+course, total sense in some tasks like text summarization or question answering,
+where both sequences share the same vocabulary. But not so much in tasks like
+machine translation, where the vocabularies could be wildly different. Right?
+Well.. It turns out that if you are using a sub-word vocabulary and you are
+translating between english and french, or english and german, then around
+85-90% of the sub-words are shared between the languages (see again [<sup id="fnref1:4"><a href="#fn:4" class="footnote-ref" role="doc-noteref">4</a></sup>]).
+So, yeah, maybe in these specific cases it makes sense, but otherwise &ndash; I don&rsquo;t
+think so.</p>
+<p>(I wonder why nobody reports translating between german and french :?
+Don&rsquo;t sue me!)</p>
+<p>Regarding sharing the same weight matrix between the target word embeddings and
+the decoder output layer. This reportedly improves model performance (see again
+[<sup id="fnref2:4"><a href="#fn:4" class="footnote-ref" role="doc-noteref">4</a></sup>]), but we have to be cautious with the initializations. Note that the
+outputs of the decoder are fed into a softmax layer, which could quickly
+saturate if these numbers have high variance. This means that the decoder output
+layer has to use some variance reduction initialization technique, like Xavier
+init. On the other hand, the embedding layer is essentially a table look-up, and
+so in order to keep variance constant, it should be initialized with zero mean
+and unit std. In addition, we will be summing the word embeddings with the
+positional embeddings, so they should be in the same scale.</p>
+<p>What we will do is provide an additional scale parameter, which will be used to
+scale the word embeddings before adding them to the positional embeddings.
+Obviously, this scale parameter will depend on the initialization of the word
+embeddings and positional embeddings, whether we use sine and cosine positional
+encoding, whether we add or concatenate, and so on.. The original paper vaguely
+mentions that they are using a scale of $\sqrt{d_{model}}$, but honestly&hellip; no one
+knows why..</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">TokenEmbedding</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, word_embed_weight, pos_embed_weight, scale, dropout):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># ...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, x):
+</span></span><span style="display:flex;"><span>        _, T <span style="color:#f92672">=</span> x<span style="color:#f92672">.</span>shape
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> T <span style="color:#f92672">&gt;=</span> self<span style="color:#f92672">.</span>max_len:
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">raise</span> <span style="color:#a6e22e">RuntimeError</span>(<span style="color:#e6db74">&#34;Sequence length exceeds the maximum allowed limit&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        pos <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>positions[:, :T]
+</span></span><span style="display:flex;"><span>        word_embed <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>embedding(x, self<span style="color:#f92672">.</span>word_embed_weight)
+</span></span><span style="display:flex;"><span>        pos_embed <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>embedding(pos, self<span style="color:#f92672">.</span>pos_embed_weight)
+</span></span><span style="display:flex;"><span>        embed <span style="color:#f92672">=</span> pos_embed <span style="color:#f92672">+</span> word_embed <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>scale
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> self<span style="color:#f92672">.</span>dropout(embed)
+</span></span></code></pre></div><p>The forward pass simply passes the tokens and the embedding matrices to a
+pytorch utility function that returns the embeddings. The word embeddings are
+then scaled and added to the positional embeddings. You could concatenate them
+as well, but people mostly just add them.</p>
+<p>Note that the tensor with positions is registered as a module buffer, so it
+resides on the same device as the model parameters. When calling the forward
+function we don&rsquo;t have to initialize a new tensor and push it to the gpu, but
+we can simply slice the buffer. However, slicing out of bounds on a cuda device
+might throw some very cryptic error messages, so we will explicitly verify that
+we don&rsquo;t exceed the maximum sequence length.</p>
+<p>
+  <figure>
+    <style>
+        small {
+            font-size: 90%;
+        }
+    </style>
+    <img src="/transformer/embedding.png" alt="Embedding">
+    <figcaption><small>An embedding block consisting of word
+embedding and positional embedding</small></figcaption>
+  </figure>
+
+</p>
+<h1 id="transformer">TRANSFORMER<a href="#transformer" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<p>Finally, let&rsquo;s see how everything connects to construct the transformer model.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Transformer</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(
+</span></span><span style="display:flex;"><span>            self, src_vocab_size, tgt_vocab_size, max_seq_len,
+</span></span><span style="display:flex;"><span>            d_model, n_heads, n_enc, n_dec, dim_mlp, dropout,
+</span></span><span style="display:flex;"><span>        ):
+</span></span><span style="display:flex;"><span>        super()<span style="color:#f92672">.</span>__init__()
+</span></span><span style="display:flex;"><span>        scale <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>sqrt(d_model)
+</span></span><span style="display:flex;"><span>        pos_embed <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Parameter(torch<span style="color:#f92672">.</span>randn(max_seq_len, d_model))
+</span></span><span style="display:flex;"><span>        src_word_embed <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Parameter(torch<span style="color:#f92672">.</span>randn(src_vocab_size, d_model) <span style="color:#f92672">/</span> scale)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> tgt_vocab_size <span style="color:#f92672">is</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>            tgt_word_embed <span style="color:#f92672">=</span> src_word_embed
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>            tgt_word_embed <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Parameter(torch<span style="color:#f92672">.</span>randn(tgt_vocab_size, d_model) <span style="color:#f92672">/</span> scale)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>src_embed <span style="color:#f92672">=</span> TokenEmbedding(src_word_embed, pos_embed, scale, dropout)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>tgt_embed <span style="color:#f92672">=</span> TokenEmbedding(tgt_word_embed, pos_embed, scale, dropout)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>tgt_proj_weight <span style="color:#f92672">=</span> tgt_word_embed
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>encoder_stack <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>ModuleList((
+</span></span><span style="display:flex;"><span>            EncoderBlock(d_model, n_heads, dim_mlp, dropout) <span style="color:#66d9ef">for</span> _ <span style="color:#f92672">in</span> range(n_enc)
+</span></span><span style="display:flex;"><span>        ))
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>enc_norm <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>LayerNorm(d_model)
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>decoder_stack <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>ModuleList((
+</span></span><span style="display:flex;"><span>            DecoderBlock(d_model, n_heads, dim_mlp, dropout) <span style="color:#66d9ef">for</span> _ <span style="color:#f92672">in</span> range(n_dec)
+</span></span><span style="display:flex;"><span>        ))
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>dec_norm <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>LayerNorm(d_model)
+</span></span></code></pre></div><p>The initializer accepts the size of the source and target vocabularies, and
+initializes word embedding matrices for the source and target sequences. Note
+that the final decoder layer projecting back to the target vocabulary will use
+the same weights as the target word embeddings. No need to transpose the matrix
+because pytorch stores the weights of the linear layers in transposed form.
+The embedding weights are initialized from a normal distribution with zero
+mean and std equal to $1 / \sqrt{d_{model}}$ because of the sharing with the
+final output layer. The word embeddings will be scaled back with a factor of
+$\sqrt{d_{model}}$.</p>
+<p>The positional embedding weights are initialized from a standard normal and are
+shared between the source and target embedding layers. Note that we need the
+maximum sequence length in order to initialize these embeddings. If the source
+and target sequences share the same vocabulary, then passing <code>None</code> for the size
+of the target vocabulary will share the same word embedding weights as well.</p>
+<p>The encoder and decoder stacks use the same settings for initializing the blocks.
+Note that we also initialize two additional LayerNorm layers which are to be
+applied at the end of each stack because of the Pre-LN architecture.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Transformer</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, <span style="color:#f92672">...</span>):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># ...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">encode</span>(self, src, src_mask):
+</span></span><span style="display:flex;"><span>        z <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>src_embed(src)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">for</span> encoder <span style="color:#f92672">in</span> self<span style="color:#f92672">.</span>encoder_stack:
+</span></span><span style="display:flex;"><span>            z <span style="color:#f92672">=</span> encoder(z, src_mask)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> self<span style="color:#f92672">.</span>enc_norm(z)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">decode</span>(self, tgt, mem, mem_mask):
+</span></span><span style="display:flex;"><span>        z <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>tgt_embed(tgt)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">for</span> decoder <span style="color:#f92672">in</span> self<span style="color:#f92672">.</span>decoder_stack:
+</span></span><span style="display:flex;"><span>            z <span style="color:#f92672">=</span> decoder(z, mem, mem_mask)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> self<span style="color:#f92672">.</span>dec_norm(z)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, src, tgt, src_mask<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>        mem <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>encode(src, src_mask)
+</span></span><span style="display:flex;"><span>        out <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>decode(tgt, mem, src_mask)
+</span></span><span style="display:flex;"><span>        tgt_scores <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>linear(out, self<span style="color:#f92672">.</span>tgt_proj_weight)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> tgt_scores
+</span></span></code></pre></div><p>The forward pass accepts a source sequence of shape $B \times T_{src}$ and a
+target sequence of shape $B \times T_{tgt}$. An optional mask for the source
+sequence can be provided with the same shape, indicating which elements should
+take part in the calculation. The output will be a tensor of shape
+$B \times T_{dec} \times D_{vocab}$ assigning to each position of the target
+sequence a vector of scores over the target vocabulary. Note that the forward
+pass uses teacher forcing and feeds the decoder the next true token instead of
+the one the model suggests.</p>
+<p>We first encode the source sequence by running it through the encoder stack.
+An additional LayerNorm layer is applied because of the Pre-LN architecture.
+The target sequence is then forwarded through the decoder stack. The final
+encodings of the source sequence are fed as key-value memory to each of the
+decoder blocks. Again we normalize the decoder output and apply the final
+projection layer to produce scores over the target vocabulary.</p>
+<p>
+  <figure>
+    <style>
+        small {
+            font-size: 90%;
+        }
+    </style>
+    <img src="/transformer/transformer.png" alt="Transformer">
+    <figcaption><small>The architecture of the Transformer model</small></figcaption>
+  </figure>
+
+</p>
+<p>Note that we are feeding the final source sequence encodings to each of the
+decoder blocks, which means that each decoder can only query the final, most
+abstract embeddings of the source sequence. Another approach would be to connect
+each encoder block with its corresponding decoder block, much like a U-net. This
+way the decoder blocks lower in the stack would query earlier embeddings, which
+might be carrying useful information. That would require having the same number
+of encoder and decoder blocks in the two stacks, but I think this is the most
+common choice anyway.</p>
+<p>Of course, you could just go all in and stack the outputs from all of the encoder
+blocks together and feed them to each and every decoder block. You would have to
+forward them through an additional linear layer to reduce the dimensionality
+back to $d_{model}$, or adjust the attention layer to accept key-value memory
+with dimension different from the query dimension. Anyway, I have never seen
+anyone do that and also I just made that up, so maybe don&rsquo;t do it.</p>
+<h1 id="sequence-to-sequence">SEQUENCE-TO-SEQUENCE<a href="#sequence-to-sequence" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<p>In order to generate a sequence during inference we will use a simple greedy
+decoding strategy. (Maybe I will add beam search at some point.)</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Transformer</span>(nn<span style="color:#f92672">.</span>Module):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, <span style="color:#f92672">...</span>):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># ...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">encode</span>(self, src, src_mask):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># ...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">decode</span>(self, tgt, mem, mem_mask):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># ...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, src, tgt, src_mask<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>):
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># ...</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">@torch.no_grad</span>()
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">greedy_decode</span>(self, src, src_mask, bos_idx, eos_idx, max_len<span style="color:#f92672">=</span><span style="color:#ae81ff">80</span>):
+</span></span><span style="display:flex;"><span>        B <span style="color:#f92672">=</span> src<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">0</span>]
+</span></span><span style="display:flex;"><span>        done <span style="color:#f92672">=</span> {i : <span style="color:#66d9ef">False</span> <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(B)}
+</span></span><span style="display:flex;"><span>        was_training <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>training
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>eval()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        tgt <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>LongTensor([[bos_idx]] <span style="color:#f92672">*</span> B)<span style="color:#f92672">.</span>to(src<span style="color:#f92672">.</span>device)
+</span></span><span style="display:flex;"><span>        mem <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>encode(src, src_mask)
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">for</span> _ <span style="color:#f92672">in</span> range(max_len<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>):
+</span></span><span style="display:flex;"><span>            out <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>decode(tgt, mem, mem_mask<span style="color:#f92672">=</span>src_mask)
+</span></span><span style="display:flex;"><span>            scores <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>linear(out, self<span style="color:#f92672">.</span>tgt_proj_weight)
+</span></span><span style="display:flex;"><span>            next_idx <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>max(scores[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>:], dim<span style="color:#f92672">=-</span><span style="color:#ae81ff">1</span>)<span style="color:#f92672">.</span>indices
+</span></span><span style="display:flex;"><span>            tgt <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>concat((tgt, next_idx), dim<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">for</span> i, idx <span style="color:#f92672">in</span> enumerate(next_idx):
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">if</span> idx[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> eos_idx: done[i] <span style="color:#f92672">=</span> <span style="color:#66d9ef">True</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> <span style="color:#66d9ef">False</span> <span style="color:#f92672">not</span> <span style="color:#f92672">in</span> done<span style="color:#f92672">.</span>values(): <span style="color:#66d9ef">break</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> was_training: self<span style="color:#f92672">.</span>train()
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> tgt
+</span></span></code></pre></div><p>The decoding function takes as argument the source sequence to be decoded and
+the start and end tokens. We will first encode the source sequence by running it
+through the encoder stack and then we will prompt the decoder with the start
+token to start generating. The decoded sequence will be generated one element at
+a time. At every step of the loop we feed the decoder the entire target sequence
+that has been generated until now. For each element the decoder will output
+scores over the target vocabulary indicating which should be the next element.
+We are only concerned with the scores for the last element of the sequence,
+because they are used to predict the next element. Decoding continues until
+the end token is produced.</p>
+<p>Since we are decoding a batch of sequences, we need to continue iterating until
+every sequence in the batch has been decoded. To keep track of that we will
+simply update a dict indicating which sequences are done.</p>
+<p>Note that the provided tokens for beginning of sequence (bos) and end of
+sequence (eos) don&rsquo;t have to be the special <code>&lt;START&gt;</code> and <code>&lt;END&gt;</code> tokens. We could
+try to start the sequence with any item from the vocabulary. We could also
+try to end the sequence with any item, but keep in mind that the model was
+trained to end sequences specifically with the <code>&lt;END&gt;</code> token.</p>
+<h1 id="so-does-it-work">SO? DOES IT WORK?<a href="#so-does-it-work" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h1>
+<p>To quickly test the code we will try to learn a simple task: reversing the order
+of a sequence.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> torch.nn.utils.rnn <span style="color:#f92672">import</span> pad_sequence
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>device <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>device(<span style="color:#e6db74">&#34;cuda&#34;</span> <span style="color:#66d9ef">if</span> torch<span style="color:#f92672">.</span>cuda<span style="color:#f92672">.</span>is_available() <span style="color:#66d9ef">else</span> <span style="color:#e6db74">&#34;cpu&#34;</span>)
+</span></span><span style="display:flex;"><span>bos_idx, eos_idx, pad_idx <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">2</span>, <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>vocab_size, max_len <span style="color:#f92672">=</span> <span style="color:#ae81ff">100</span>, <span style="color:#ae81ff">16</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>data_loader <span style="color:#f92672">=</span> data<span style="color:#f92672">.</span>DataLoader(  <span style="color:#75715e"># random sequences of different lengths</span>
+</span></span><span style="display:flex;"><span>    dataset<span style="color:#f92672">=</span>[torch<span style="color:#f92672">.</span>randint(<span style="color:#ae81ff">3</span>, vocab_size, (randint(max_len<span style="color:#f92672">//</span><span style="color:#ae81ff">2</span>, max_len),)) <span style="color:#66d9ef">for</span> _ <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">50000</span>)],
+</span></span><span style="display:flex;"><span>    batch_size<span style="color:#f92672">=</span><span style="color:#ae81ff">128</span>, shuffle<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>, drop_last<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>,
+</span></span><span style="display:flex;"><span>    collate_fn<span style="color:#f92672">=</span><span style="color:#66d9ef">lambda</span> batch: (
+</span></span><span style="display:flex;"><span>        pad_sequence(batch, batch_first<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>, padding_value<span style="color:#f92672">=</span>pad_idx),
+</span></span><span style="display:flex;"><span>        pad_sequence(           <span style="color:#75715e"># flip the sequence and add &lt;START&gt; and &lt;END&gt; tags</span>
+</span></span><span style="display:flex;"><span>            [torch<span style="color:#f92672">.</span>LongTensor([bos_idx] <span style="color:#f92672">+</span> x<span style="color:#f92672">.</span>flip(<span style="color:#ae81ff">0</span>)<span style="color:#f92672">.</span>tolist() <span style="color:#f92672">+</span> [eos_idx]) <span style="color:#66d9ef">for</span> x <span style="color:#f92672">in</span> batch],
+</span></span><span style="display:flex;"><span>            batch_first<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>, padding_value<span style="color:#f92672">=</span>pad_idx,
+</span></span><span style="display:flex;"><span>    )),
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>The dataset will consist of 50000 random sequences of numbers with varying
+lengths between 8 and 16 elements. The target sequence is simply the reversed
+sequence nested between <code>&lt;START&gt;</code> and <code>&lt;END&gt;</code> tags. The data loader will
+generate random batches from the training set and will automatically pad shorter
+sequences to match the length of the longest sequence in the batch.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>transformer <span style="color:#f92672">=</span> Transformer(
+</span></span><span style="display:flex;"><span>    src_vocab_size<span style="color:#f92672">=</span>vocab_size, tgt_vocab_size<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>, max_seq_len<span style="color:#f92672">=</span><span style="color:#ae81ff">256</span>,
+</span></span><span style="display:flex;"><span>    d_model<span style="color:#f92672">=</span><span style="color:#ae81ff">64</span>, n_heads<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>, n_enc<span style="color:#f92672">=</span><span style="color:#ae81ff">2</span>, n_dec<span style="color:#f92672">=</span><span style="color:#ae81ff">2</span>, dim_mlp<span style="color:#f92672">=</span><span style="color:#ae81ff">128</span>, dropout<span style="color:#f92672">=</span><span style="color:#ae81ff">0.1</span>,
+</span></span><span style="display:flex;"><span>)<span style="color:#f92672">.</span>to(device)
+</span></span><span style="display:flex;"><span>optim <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>optim<span style="color:#f92672">.</span>Adam(transformer<span style="color:#f92672">.</span>parameters(), lr<span style="color:#f92672">=</span><span style="color:#ae81ff">1e-3</span>, weight_decay<span style="color:#f92672">=</span><span style="color:#ae81ff">0.</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> _ <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">30</span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> src, tgt <span style="color:#f92672">in</span> data_loader:
+</span></span><span style="display:flex;"><span>        src, tgt <span style="color:#f92672">=</span> src<span style="color:#f92672">.</span>to(device), tgt<span style="color:#f92672">.</span>to(device)
+</span></span><span style="display:flex;"><span>        tgt_in, tgt_out <span style="color:#f92672">=</span> tgt[:, :<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>], tgt[:, <span style="color:#ae81ff">1</span>:]
+</span></span><span style="display:flex;"><span>        logits <span style="color:#f92672">=</span> transformer(src, tgt_in, (src <span style="color:#f92672">!=</span> pad_idx))
+</span></span><span style="display:flex;"><span>        loss <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>cross_entropy(
+</span></span><span style="display:flex;"><span>            logits<span style="color:#f92672">.</span>permute(<span style="color:#ae81ff">0</span>,<span style="color:#ae81ff">2</span>,<span style="color:#ae81ff">1</span>), tgt_out, ignore_index<span style="color:#f92672">=</span>pad_idx)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        optim<span style="color:#f92672">.</span>zero_grad()
+</span></span><span style="display:flex;"><span>        loss<span style="color:#f92672">.</span>backward()
+</span></span><span style="display:flex;"><span>        torch<span style="color:#f92672">.</span>nn<span style="color:#f92672">.</span>utils<span style="color:#f92672">.</span>clip_grad_norm_(transformer<span style="color:#f92672">.</span>parameters(), <span style="color:#ae81ff">1.</span>)
+</span></span><span style="display:flex;"><span>        optim<span style="color:#f92672">.</span>step()
+</span></span></code></pre></div><p>We will use a relatively small model for this simple task. Since both the source
+and the target sequences come from the same vocabulary, we will share the word
+embedding matrices by setting <code>tgt_vocab_size=None</code>. Note that during training
+we feed all but the last element of the target sequence. We don&rsquo;t want to feed
+the <code>&lt;END&gt;</code> token, we only want the model to predict it. When computing the loss
+we compare the predictions of the model with all but the first element of the
+target sequence.</p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<div class="footnotes" role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn:1">
+<p><a href="https://arxiv.org/abs/1706.03762">2017</a> &ldquo;Attention is all you
+need&rdquo; by Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones,
+Aidan N. Gomez, Lukasz Kaiser, Illia Polosukhin&#160;<a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:2">
+<p><a href="https://arxiv.org/abs/1905.09263">2019</a> &ldquo;FastSpeech: fast,
+robust and controllable text to speech&rdquo; by Yi Ren, Yangjun Ruan, Xu Tan,
+Tao Qin, Sheng Zhao, Zhou Zhao, Tie-Yan Liu&#160;<a href="#fnref:2" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:3">
+<p><a href="https://arxiv.org/abs/2002.04745">2020</a> &ldquo;On layer normalization in
+the transformer architecture&rdquo; by Ruibin Xiong, Yunchang Yang, Di He, Kai Zheng,
+Shuxin Zheng, Chen Xing, Huishuai Zhang, Yanyan Lan, Liwei Wang, Tie-Yan Liu&#160;<a href="#fnref:3" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:4">
+<p><a href="https://arxiv.org/abs/1608.05859">2016</a> &ldquo;Using the output embeddings
+to improve language models&rdquo; by Ofir Press, Lior Wolf&#160;<a href="#fnref:4" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a>&#160;<a href="#fnref1:4" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a>&#160;<a href="#fnref2:4" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+</ol>
+</div>
+
+      </div></div>
+
+  
+    
+<div class="pagination">
+    <div class="pagination__title">
+        <span class="pagination__title-h">Read other posts</span>
+        <hr />
+    </div>
+    <div class="pagination__buttons">
+        
+        
+        <span class="button next">
+            <a href="/posts/res-nets/">
+                <span class="button__text">ResNet, ResNeXt, RegNet,... what else?</span>
+                <span class="button__icon">→</span>
+            </a>
+        </span>
+        
+    </div>
+</div>
+
+  
+
+  
+    
+
+  
+</article>
+
+  </div>
+
+  
+    
+
+
+<footer class="footer">
+  <div class="footer__inner">
+    
+      <div class="copyright">
+        <span>© 2023 Powered by <a href="https://gohugo.io">Hugo</a></span>
+    
+      <span>:: <a href="https://github.com/panr/hugo-theme-terminal" target="_blank">Theme</a> made by <a href="https://github.com/panr" target="_blank">panr</a></span>
+      </div>
+  </div>
+</footer>
+
+
+
+
+
+
+<script type="text/javascript" src="/bundle.min.js"></script>
+
+
+  
+</div>
+
+</body>
+</html>

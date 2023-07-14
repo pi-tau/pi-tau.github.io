@@ -1,9 +1,13 @@
-+++
-title = "An annotatedER Transformer"
-date = "2023-07-13"
-description = "An blog post about the Transformer model with even more annotations"
-mathjax = true
-+++
+---
+sitemap:
+    changefreq: weekly
+    priority: 0.9
+title: An annotatedER Transformer
+date: 2023-07-13
+description: A blog post about the Transformer model with even more annotations
+keywords: ["transformer", "nlp", "deep learning", "multi-head attention", "implementation details", "explained"]
+mathjax: true
+---
 
 This post is based on the
 *[The annotated transformer](http://nlp.seas.harvard.edu/annotated-transformer/)*

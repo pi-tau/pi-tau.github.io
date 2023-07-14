@@ -1,9 +1,13 @@
-+++
-title = "ResNet, ResNeXt, RegNet,... what else?"
-date = "2023-07-01"
-description = "A brief history of the most famous CNN architecture and how it was further improved"
-mathjax = true
-+++
+---
+sitemap:
+    changefreq: monthly
+    priority: 0.9
+title: ResNet, ResNeXt, RegNet,... what else?
+date: 2023-07-01
+description: A brief history of the most famous CNN architecture and how it was further improved
+keywords: ["cnn", "computer vision", "deep learning", "resnet", "resnext", "implementation details", "explained"]
+mathjax: True
+---
 
 The ResNet was introduced in the [paper](https://arxiv.org/abs/1512.03385)[^ResNet]
 *"Deep residual learning for image recognition"* by Kaiming He et al. in 2015.

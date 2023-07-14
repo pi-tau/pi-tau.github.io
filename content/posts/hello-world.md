@@ -1,8 +1,11 @@
-+++
-title = "Hello World"
-date = "2023-06-30"
-description = " "
-+++
+---
+sitemap:
+    changefreq: never
+    priority: 0.1
+title: Hello World
+date: 2023-06-30
+description: " "
+---
 
 # MY FIRST BLOG POST
 
