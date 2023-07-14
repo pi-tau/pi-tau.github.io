@@ -425,9 +425,9 @@ if were using linear convolutions instead of micro-networks. Later models,
 however, take a less extreme approach and add one more FC layer to scale the
 output to match the number of classes.</p>
 <p>The number of stages should be such that the spatial dimensions of the tensor
-are reduced to $\sim 8 \times 8$. For CIFAR-10, for example, we need 3 stages.
-For ImageNet what is done in practice is that the very first convolution is a
-$7 \times 7$ conv layer with stride of 2, scaling the input from
+are reduced to approx. $8 \times 8$. For CIFAR-10, for example, we need 3
+stages. For ImageNet what is done in practice is that the very first convolution
+is a $7 \times 7$ conv layer with stride of 2, scaling the input from
 $224 \times 224$ to $112 \times 112$. Then 4 stages are applied further reducing
 the size to $112 / 2^4 = 7 \times 7$.</p>
 <p>

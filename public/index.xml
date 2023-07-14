@@ -276,7 +276,7 @@ elementwise non-linearities in the self-attention layer, stacking more
 self-attention layers would just re-average the value vectors. Thus, a small
 neural net is added after each self-attention layer to post-process each output
 vector separately. Usually this network is a two-layer MLP with inner
-dimensionality $\sim 2-8 \times d_{model}$. A wider shallow network allows for
+dimensionality $2-8 \times d_{model}$. A wider shallow network allows for
 faster parallelizable execution than a deeper narrow network.&lt;/p&gt;
 &lt;p&gt;Why use an MLP, and not some other type of layer?&lt;/p&gt;
 &lt;p&gt;In the &lt;a href=&#34;https://arxiv.org/abs/1905.09263&#34;&gt;paper&lt;/a&gt;&lt;sup id=&#34;fnref:2&#34;&gt;&lt;a href=&#34;#fn:2&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;2&lt;/a&gt;&lt;/sup&gt; &lt;em&gt;&amp;ldquo;FastSpeech: fast,
@@ -616,7 +616,7 @@ forward them through an additional linear layer to reduce the dimensionality
 back to $d_{model}$, or adjust the attention layer to accept key-value memory
 with dimension different from the query dimension. Anyway, I have never seen
 anyone do that and also I just made that up, so maybe don&amp;rsquo;t do it.&lt;/p&gt;
-&lt;h2 id=&#34;sequence-to-sequence&#34;&gt;SEQUENCE-TO-SEQUENCE&lt;/h2&gt;
+&lt;h2 id=&#34;inference&#34;&gt;INFERENCE&lt;/h2&gt;
 &lt;p&gt;In order to generate a sequence during inference we will use a simple greedy
 decoding strategy. (Maybe I will add beam search at some point.)&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;Transformer&lt;/span&gt;(nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;Module):
@@ -713,6 +713,11 @@ sequences to match the length of the longest sequence in the batch.&lt;/p&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        loss&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;backward()
 &lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;nn&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;utils&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;clip_grad_norm_(transformer&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;parameters(), &lt;span style=&#34;color:#ae81ff&#34;&gt;1.&lt;/span&gt;)
 &lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        optim&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;step()
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;x &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; torch&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;LongTensor([&lt;span style=&#34;color:#ae81ff&#34;&gt;3&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;5&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;8&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;13&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;21&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;34&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;55&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;89&lt;/span&gt;])&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;unsqueeze(dim&lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ae81ff&#34;&gt;0&lt;/span&gt;)&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;to(device)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;y &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; transformer&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;greedy_decode(x, &lt;span style=&#34;color:#66d9ef&#34;&gt;None&lt;/span&gt;, bos_idx, eos_idx)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;print(y)
+&lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;&lt;span style=&#34;color:#f92672&#34;&gt;&amp;gt;&amp;gt;&amp;gt;&lt;/span&gt; [&lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;89&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;55&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;34&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;21&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;13&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;8&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;5&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;3&lt;/span&gt;, &lt;span style=&#34;color:#ae81ff&#34;&gt;2&lt;/span&gt;]
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;We will use a relatively small model for this simple task. Since both the source
 and the target sequences come from the same vocabulary, we will share the word
 embedding matrices by setting &lt;code&gt;tgt_vocab_size=None&lt;/code&gt;. Note that during training
@@ -987,9 +992,9 @@ if were using linear convolutions instead of micro-networks. Later models,
 however, take a less extreme approach and add one more FC layer to scale the
 output to match the number of classes.&lt;/p&gt;
 &lt;p&gt;The number of stages should be such that the spatial dimensions of the tensor
-are reduced to $\sim 8 \times 8$. For CIFAR-10, for example, we need 3 stages.
-For ImageNet what is done in practice is that the very first convolution is a
-$7 \times 7$ conv layer with stride of 2, scaling the input from
+are reduced to approx. $8 \times 8$. For CIFAR-10, for example, we need 3
+stages. For ImageNet what is done in practice is that the very first convolution
+is a $7 \times 7$ conv layer with stride of 2, scaling the input from
 $224 \times 224$ to $112 \times 112$. Then 4 stages are applied further reducing
 the size to $112 / 2^4 = 7 \times 7$.&lt;/p&gt;
 &lt;p&gt;

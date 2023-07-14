@@ -293,7 +293,7 @@ elementwise non-linearities in the self-attention layer, stacking more
 self-attention layers would just re-average the value vectors. Thus, a small
 neural net is added after each self-attention layer to post-process each output
 vector separately. Usually this network is a two-layer MLP with inner
-dimensionality $\sim 2-8 \times d_{model}$. A wider shallow network allows for
+dimensionality $2-8 \times d_{model}$. A wider shallow network allows for
 faster parallelizable execution than a deeper narrow network.
 
 Why use an MLP, and not some other type of layer?
@@ -648,7 +648,7 @@ with dimension different from the query dimension. Anyway, I have never seen
 anyone do that and also I just made that up, so maybe don't do it.
 
 
-## SEQUENCE-TO-SEQUENCE
+## INFERENCE
 In order to generate a sequence during inference we will use a simple greedy
 decoding strategy. (Maybe I will add beam search at some point.)
 
@@ -759,6 +759,11 @@ for _ in range(30):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(transformer.parameters(), 1.)
         optim.step()
+
+x = torch.LongTensor([3, 5, 8, 13, 21, 34, 55, 89]).unsqueeze(dim=0).to(device)
+y = transformer.greedy_decode(x, None, bos_idx, eos_idx)
+print(y)
+>>> [1, 89, 55, 34, 21, 13, 8, 5, 3, 2]
 ```
 
 We will use a relatively small model for this simple task. Since both the source

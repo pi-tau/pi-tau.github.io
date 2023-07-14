@@ -48,3 +48,5 @@ languages:
       - identifier: contact
         name: Contact
         url: /contact
+
+enableRobotsTXT: true
