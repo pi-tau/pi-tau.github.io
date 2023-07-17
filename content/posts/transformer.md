@@ -215,8 +215,8 @@ GPT. However, note that during evaluation dropout is not applied so we are
 probably fine.
 
 One final detail is the application of a mask over the attention scores. One
-reason why this is done because the input to the attention layer is a batch of
-sequences, and not all sequences in the batch have the same length. Shorter
+reason why this is done is because the input to the attention layer is a batch
+of sequences, and not all sequences in the batch have the same length. Shorter
 sequences are padded, and the padded elements need to be masked so that they
 don't take part in the attention score computation. In this case the mask is
 of shape $B \times T \times T$ and is different for every sequence of the batch.
@@ -466,10 +466,11 @@ different frequencies, so we can pass that as well if we want. However, we will
 be using randomly initialized positional embeddings that will be learned from
 scratch. We could also pass directly learned word embeddings if we want.
 
-The paper also briefly mentions that they will be using the same word embeddings
-for both the source and the target sequences. And, in addition, this same
-embedding matrix will be used for the final output layer of the decoder, citing
-previous research done [here](https://arxiv.org/abs/1608.05859)[^Embed].
+The paper also briefly mentions (see Sec. 3.4) that they will be using the same
+word embeddings for both the source and the target sequences. And, in addition,
+this same embedding matrix will be used for the final output layer of the
+decoder, citing previous research done
+[here](https://arxiv.org/abs/1608.05859)[^Embed].
 
 Sharing the same embedding matrix for the source and target sequences makes, of
 course, total sense in some tasks like text summarization or question answering,
