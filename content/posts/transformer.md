@@ -5,7 +5,7 @@ sitemap:
 title: An annotatedER Transformer
 date: 2023-07-13
 description: A blog post about the Transformer model with even more annotations
-keywords: ["transformer", "nlp", "deep learning", "multi-head attention", "implementation details", "explained"]
+keywords: ["transformer", "nlp", "deep learning", "multi-head attention", "implementation details", "explained", "positional embeddings", "weight sharing"]
 mathjax: true
 ToC: true
 ---
@@ -17,8 +17,9 @@ I decided to add some more annotations regarding the architecture of the
 transformer model[^Transformer] and why some specific design choices were made.
 
 But first, a longer explanation about the attention layer in the transformer...
-[Skip to the code](#multi-head-attention-layer) if you don't feel like reading
-text. Also check out [github](https://github.com/pi-tau/transformer).
+If you don't feel like reading then [Skip](#multi-head-attention-layer) to the
+first code snippet or check out the full implementation on
+[github](https://github.com/pi-tau/transformer).
 
 ## ATTENTION
 What this layer does is it takes a sequence of elements $x_1, x_2, \dots, x_T$
@@ -522,10 +523,10 @@ class TokenEmbedding(nn.Module):
         return self.dropout(embed)
 ```
 
-The forward pass simply passes the tokens and the embedding matrices to a
-pytorch utility function that returns the embeddings. The word embeddings are
-then scaled and added to the positional embeddings. You could concatenate them
-as well, but people mostly just add them.
+The forward pass simply looks up the word embeddings and the positional
+embeddings of the sequence elements. The word embeddings are then scaled and
+added to the positional embeddings. You could concatenate them as well, but
+people mostly just add them.
 
 Note that the tensor with positions is registered as a module buffer, so it
 resides on the same device as the model parameters. When calling the forward

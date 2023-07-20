@@ -14,7 +14,7 @@
       
       <guid>/posts/transformer/</guid>
       <description>This post is based on the The annotated transformer and its older version. I decided to add some more annotations regarding the architecture of the transformer model1 and why some specific design choices were made.
-But first, a longer explanation about the attention layer in the transformer&amp;hellip; Skip to the code if you don&amp;rsquo;t feel like reading text. Also check out github.
+But first, a longer explanation about the attention layer in the transformer&amp;hellip; If you don&amp;rsquo;t feel like reading then Skip to the first code snippet or check out the full implementation on github.
 ATTENTION What this layer does is it takes a sequence of elements $x_1, x_2, \dots, x_T$ and for every element $x_i$ produces an encoding $z_i$, that captures somehow the context of $x_i$, i.</description>
       <content>&lt;p&gt;This post is based on the
 &lt;em&gt;&lt;a href=&#34;http://nlp.seas.harvard.edu/annotated-transformer/&#34;&gt;The annotated transformer&lt;/a&gt;&lt;/em&gt;
@@ -22,8 +22,9 @@ and its &lt;a href=&#34;http://nlp.seas.harvard.edu/2018/04/03/attention.html&#3
 I decided to add some more annotations regarding the architecture of the
 transformer model&lt;sup id=&#34;fnref:1&#34;&gt;&lt;a href=&#34;#fn:1&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;1&lt;/a&gt;&lt;/sup&gt; and why some specific design choices were made.&lt;/p&gt;
 &lt;p&gt;But first, a longer explanation about the attention layer in the transformer&amp;hellip;
-&lt;a href=&#34;#multi-head-attention-layer&#34;&gt;Skip to the code&lt;/a&gt; if you don&amp;rsquo;t feel like reading
-text. Also check out &lt;a href=&#34;https://github.com/pi-tau/transformer&#34;&gt;github&lt;/a&gt;.&lt;/p&gt;
+If you don&amp;rsquo;t feel like reading then &lt;a href=&#34;#multi-head-attention-layer&#34;&gt;Skip&lt;/a&gt; to the
+first code snippet or check out the full implementation on
+&lt;a href=&#34;https://github.com/pi-tau/transformer&#34;&gt;github&lt;/a&gt;.&lt;/p&gt;
 &lt;h2 id=&#34;attention&#34;&gt;ATTENTION&lt;/h2&gt;
 &lt;p&gt;What this layer does is it takes a sequence of elements $x_1, x_2, \dots, x_T$
 and for every element $x_i$ produces an encoding $z_i$, that captures somehow
@@ -488,10 +489,10 @@ knows why..&lt;/p&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        pos_embed &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; F&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;embedding(pos, self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;pos_embed_weight)
 &lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        embed &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; pos_embed &lt;span style=&#34;color:#f92672&#34;&gt;+&lt;/span&gt; word_embed &lt;span style=&#34;color:#f92672&#34;&gt;*&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;scale
 &lt;/span&gt;&lt;/span&gt;&lt;span style=&#34;display:flex;&#34;&gt;&lt;span&gt;        &lt;span style=&#34;color:#66d9ef&#34;&gt;return&lt;/span&gt; self&lt;span style=&#34;color:#f92672&#34;&gt;.&lt;/span&gt;dropout(embed)
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The forward pass simply passes the tokens and the embedding matrices to a
-pytorch utility function that returns the embeddings. The word embeddings are
-then scaled and added to the positional embeddings. You could concatenate them
-as well, but people mostly just add them.&lt;/p&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The forward pass simply looks up the word embeddings and the positional
+embeddings of the sequence elements. The word embeddings are then scaled and
+added to the positional embeddings. You could concatenate them as well, but
+people mostly just add them.&lt;/p&gt;
 &lt;p&gt;Note that the tensor with positions is registered as a module buffer, so it
 resides on the same device as the model parameters. When calling the forward
 function we don&amp;rsquo;t have to initialize a new tensor and push it to the gpu, but

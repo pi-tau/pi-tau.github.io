@@ -7,7 +7,7 @@
   <meta http-equiv="content-type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="A blog post about the Transformer model with even more annotations" />
-<meta name="keywords" content="transformer, nlp, deep learning, multi-head attention, implementation details, explained" />
+<meta name="keywords" content="transformer, nlp, deep learning, multi-head attention, implementation details, explained, positional embeddings, weight sharing" />
 
   <meta name="robots" content="noodp" />
 
@@ -204,8 +204,9 @@ and its <a href="http://nlp.seas.harvard.edu/2018/04/03/attention.html">older ve
 I decided to add some more annotations regarding the architecture of the
 transformer model<sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup> and why some specific design choices were made.</p>
 <p>But first, a longer explanation about the attention layer in the transformer&hellip;
-<a href="#multi-head-attention-layer">Skip to the code</a> if you don&rsquo;t feel like reading
-text. Also check out <a href="https://github.com/pi-tau/transformer">github</a>.</p>
+If you don&rsquo;t feel like reading then <a href="#multi-head-attention-layer">Skip</a> to the
+first code snippet or check out the full implementation on
+<a href="https://github.com/pi-tau/transformer">github</a>.</p>
 <h2 id="attention">ATTENTION<a href="#attention" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
 <p>What this layer does is it takes a sequence of elements $x_1, x_2, \dots, x_T$
 and for every element $x_i$ produces an encoding $z_i$, that captures somehow
@@ -670,10 +671,10 @@ knows why..</p>
 </span></span><span style="display:flex;"><span>        pos_embed <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>embedding(pos, self<span style="color:#f92672">.</span>pos_embed_weight)
 </span></span><span style="display:flex;"><span>        embed <span style="color:#f92672">=</span> pos_embed <span style="color:#f92672">+</span> word_embed <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>scale
 </span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> self<span style="color:#f92672">.</span>dropout(embed)
-</span></span></code></pre></div><p>The forward pass simply passes the tokens and the embedding matrices to a
-pytorch utility function that returns the embeddings. The word embeddings are
-then scaled and added to the positional embeddings. You could concatenate them
-as well, but people mostly just add them.</p>
+</span></span></code></pre></div><p>The forward pass simply looks up the word embeddings and the positional
+embeddings of the sequence elements. The word embeddings are then scaled and
+added to the positional embeddings. You could concatenate them as well, but
+people mostly just add them.</p>
 <p>Note that the tensor with positions is registered as a module buffer, so it
 resides on the same device as the model parameters. When calling the forward
 function we don&rsquo;t have to initialize a new tensor and push it to the gpu, but
