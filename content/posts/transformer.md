@@ -513,7 +513,7 @@ class TokenEmbedding(nn.Module):
 
     def forward(self, x):
         _, T = x.shape
-        if T >= self.max_len:
+        if T > self.max_len:
             raise RuntimeError("Sequence length exceeds the maximum allowed limit")
 
         pos = self.positions[:, :T]
@@ -722,10 +722,10 @@ from torch.nn.utils.rnn import pad_sequence
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 bos_idx, eos_idx, pad_idx = 1, 2, 0
-vocab_size, max_len = 100, 16
+vocab_size, src_len = 100, 16
 
 data_loader = data.DataLoader(  # random sequences of different lengths
-    dataset=[torch.randint(3, vocab_size, (randint(max_len//2, max_len),)) for _ in range(50000)],
+    dataset=[torch.randint(3, vocab_size, (randint(src_len//2, src_len),)) for _ in range(50000)],
     batch_size=128, shuffle=True, drop_last=True,
     collate_fn=lambda batch: (
         pad_sequence(batch, batch_first=True, padding_value=pad_idx),
@@ -744,12 +744,12 @@ sequences to match the length of the longest sequence in the batch.
 
 ```python
 transformer = Transformer(
-    src_vocab_size=vocab_size, tgt_vocab_size=None, max_seq_len=256,
-    d_model=64, n_heads=1, n_enc=2, n_dec=2, dim_mlp=128, dropout=0.1,
+    src_vocab_size=vocab_size, tgt_vocab_size=None, max_seq_len=32,
+    d_model=64, n_heads=2, n_enc=2, n_dec=2, dim_mlp=128, dropout=0.1,
 ).to(device)
-optim = torch.optim.Adam(transformer.parameters(), lr=1e-3, weight_decay=0.)
+optim = torch.optim.AdamW(transformer.parameters(), lr=1e-3, weight_decay=1e-4)
 
-for _ in range(30):
+for _ in range(10):
     for src, tgt in data_loader:
         src, tgt = src.to(device), tgt.to(device)
         tgt_in, tgt_out = tgt[:, :-1], tgt[:, 1:]
@@ -763,7 +763,7 @@ for _ in range(30):
         optim.step()
 
 x = torch.LongTensor([3, 5, 8, 13, 21, 34, 55, 89]).unsqueeze(dim=0).to(device)
-y = transformer.greedy_decode(x, None, bos_idx, eos_idx)
+y = transformer.greedy_decode(x, None, bos_idx, eos_idx, max_len=32)
 print(y)
 >>> [1, 89, 55, 34, 21, 13, 8, 5, 3, 2]
 ```
@@ -774,7 +774,8 @@ embedding matrices by setting `tgt_vocab_size=None`. Note that during training
 we feed all but the last element of the target sequence. We don't want to feed
 the `<END>` token, we only want the model to predict it. When computing the loss
 we compare the predictions of the model with all but the first element of the
-target sequence.
+target sequence. To generate the mask for the source sequence we will simply
+compare each source token with the `<PAD>` tag.
 
 
 <!--
