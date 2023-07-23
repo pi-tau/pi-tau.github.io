@@ -5,7 +5,7 @@ sitemap:
 title: An annotatedER Transformer
 date: 2023-07-13
 description: A blog post about the Transformer model with even more annotations
-keywords: ["transformer", "nlp", "deep learning", "multi-head attention", "implementation details", "explained", "positional embeddings", "weight sharing"]
+keywords: ["transformer", "nlp", "deep learning", "multi-head attention", "implementation details", "explained", "positional embeddings", "weight sharing", "minimum padding", "similar sequence length batching"]
 mathjax: true
 ToC: true
 ---
@@ -754,8 +754,7 @@ for _ in range(10):
         src, tgt = src.to(device), tgt.to(device)
         tgt_in, tgt_out = tgt[:, :-1], tgt[:, 1:]
         logits = transformer(src, tgt_in, (src != pad_idx))
-        loss = F.cross_entropy(
-            logits.permute(0,2,1), tgt_out, ignore_index=pad_idx)
+        loss = F.cross_entropy(logits.permute(0,2,1), tgt_out, ignore_index=pad_idx)
 
         optim.zero_grad()
         loss.backward()
@@ -777,6 +776,164 @@ we compare the predictions of the model with all but the first element of the
 target sequence. To generate the mask for the source sequence we will simply
 compare each source token with the `<PAD>` tag.
 
+
+## MACHINE TRANSLATION
+Finally, let us consider a more realistic example using the Multi30k
+German-English translation dataset.
+
+```python
+from torch.nn.utils.rnn import pad_sequence
+from torchtext.datasets import Multi30k
+from torchtext.data.utils import get_tokenizer
+from torchtext.vocab import vocab
+
+train_data = Multi30k(root="datasets", split="train")
+train_data = [(src, tgt) for src, tgt in train_data if len(src) > 0]
+
+UNK, PAD, BOS, EOS = ("<UNK>", "<PAD>", "<START>", "<END>")
+tokenizer = get_tokenizer("basic_english")
+en_counter, de_counter = Counter(), Counter()
+for src, tgt in train_data:
+    en_counter.update(tokenizer(src))
+    de_counter.update(tokenizer(tgt))
+de_vocab = vocab(en_counter, specials=[UNK, PAD, BOS, EOS])
+de_vocab.set_default_index(de_vocab[UNK])
+en_vocab = vocab(de_counter, specials=[UNK, PAD, BOS, EOS])
+en_vocab.set_default_index(en_vocab[UNK])
+pad_idx = de_vocab[PAD] # pad_idx is 1
+assert en_vocab[PAD] == de_vocab[PAD]
+```
+
+We will use a very basic english tokenizer for both languages. We will also use
+the torchtext vocab object to create a vocabulary that supports mapping from
+tokens to indices and vice-versa.
+
+
+```python
+lengths = [len(src) for src, _ in train_data]
+batch_size = 128
+train_loader = data.DataLoader(
+    dataset=train_data,
+    batch_size=batch_size, shuffle=True, drop_last=True,
+    collate_fn=lambda batch: (
+        pad_sequence(
+            [torch.LongTensor(de_vocab(tokenizer(x))) for x, _ in batch],
+            batch_first=True, padding_value=pad_idx),
+        pad_sequence(
+            [torch.LongTensor(en_vocab([BOS] + tokenizer(y) + [EOS])) for _, y in batch],
+            batch_first=True, padding_value=pad_idx),
+    ),
+    num_workers=4,
+)
+```
+
+When initializing the data loader we will provide a collate function that will
+tokenize and then pad the src and tgt sequences. For the tgt sequence we also
+add the `<START>` and `<END>` tokens.
+
+```python
+transformer = Transformer(
+    src_vocab_size=len(de_vocab), tgt_vocab_size=len(en_vocab), max_seq_len=256,
+    d_model=256, n_heads=8, n_enc=4, n_dec=4, dim_mlp=512, dropout=0.1,
+)
+transformer.to(device)
+optim = torch.optim.AdamW(transformer.parameters(), lr=1e-4, weight_decay=1e-4)
+
+for e in range(30):
+    for src, tgt in train_loader:
+        src, tgt = src.to(device), tgt.to(device)
+
+        # Forward pass.
+        tgt_in, tgt_out = tgt[:, :-1], tgt[:, 1:]
+        src_mask = (src != pad_idx)
+        logits = transformer(src, tgt_in, src_mask)
+        loss = F.cross_entropy(logits.permute(0,2,1), tgt_out, ignore_index=pad_idx)
+
+        # Back-prop.
+        optim.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(transformer.parameters(), 1.)
+        optim.step()
+
+sent = ["zwei", "frauen", "spazieren", "und", "lachen", "im", "park", "."]
+x = torch.LongTensor(de_vocab(sent)).unsqueeze(dim=0).to(device)
+y = transformer.greedy_decode(x, None, en_vocab[BOS], en_vocab[EOS])
+print(en_vocab.lookup_tokens(y[0].tolist()))
+>>> ['<START>', 'two', 'women', 'are', 'walking', 'and', 'laughing', 'in', 'the', 'park', '.', '<END>']
+```
+
+The dataset is fairly small so we won't need a big model. Using these settings
+the model has $12.5M$ params, and in only 30 epochs (20 mins on may laptop) it
+learns to generate some decent looking translations.
+
+
+## TRICKS: BATCHING BY LENGTH
+When sampling batches we actually want to have sequences with similar lengths in
+each batch, so that there is minimum padding. For this reason we will provide
+our own batch sampler that does that.
+
+```python
+class BatchSampler:
+
+    def __init__(self, lengths, batch_size):
+        self.lengths = lengths
+        self.batch_size = batch_size
+
+    def __iter__(self):
+        size = len(self.lengths)
+        indices = list(range(size))
+        random.shuffle(indices)
+
+        step = 100 * self.batch_size
+        for i in range(0, size, step):
+            pool = indices[i:i+step]
+            pool = sorted(pool, key=lambda x: self.lengths[x])
+            for j in range(0, len(pool), self.batch_size):
+                if j + self.batch_size > len(pool): # assume drop_last=True
+                    break
+                # Ideally, there should also be some shuffling here.
+                yield pool[j:j+self.batch_size]
+
+    def __len__(self): return len(self.lengths) // self.batch_size
+```
+
+The batch sampler is initialized by providing a list with the lengths of each
+of the sequences in the dataset. During iteration, the sampler will hold a pool
+of sequence indices sorted by sequence length. Each batch will be drawn from the
+sorted pool, thus reducing the amount of padding. We chose here the pool to be
+$100 \times$ the batch size, but for other tasks a different setting might work
+better. Note that we are also implementing the `__len__` method, which would
+allow us to call `len()` on the data loader.
+
+```python
+train_loader = data.DataLoader(
+    dataset=train_data,
+    # batch_size=batch_size, shuffle=True, drop_last=True,
+    batch_sampler=BatchSampler(lengths, batch_size),
+    collate_fn=lambda batch: (
+        pad_sequence(
+            [torch.LongTensor(de_vocab(tokenizer(x))) for x, _ in batch],
+            batch_first=True, padding_value=pad_idx),
+        pad_sequence(
+            [torch.LongTensor(en_vocab([BOS] + tokenizer(y) + [EOS])) for _, y in batch],
+            batch_first=True, padding_value=pad_idx),
+    ),
+    num_workers=4,
+)
+
+sum((x == pad_idx).sum() / x.shape[0] for x, _ in train_loader) / len(train_loader)
+>>> 15.25 # when no special batching
+>>> 3.62  # with our batch sampler
+```
+
+When initializing the data loader, instead of providing the batch size
+parameter, we will pass an instance of our batch sampler. To measure the
+effectiveness of our batch sampler we will calculate the average number of pads
+per sequence.
+
+
+<!-- # TODO -->
+<!-- ## TRICKS: LABEL SMOOTHING -->
 
 <!--
 # MISC

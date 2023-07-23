@@ -7,7 +7,7 @@
   <meta http-equiv="content-type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="A blog post about the Transformer model with even more annotations" />
-<meta name="keywords" content="transformer, nlp, deep learning, multi-head attention, implementation details, explained, positional embeddings, weight sharing" />
+<meta name="keywords" content="transformer, nlp, deep learning, multi-head attention, implementation details, explained, positional embeddings, weight sharing, minimum padding, similar sequence length batching" />
 
   <meta name="robots" content="follow, index" />
 
@@ -192,6 +192,8 @@ src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <li><a href="#transformer">TRANSFORMER</a></li>
     <li><a href="#inference">INFERENCE</a></li>
     <li><a href="#so-does-it-work">SO? DOES IT WORK?</a></li>
+    <li><a href="#machine-translation">MACHINE TRANSLATION</a></li>
+    <li><a href="#tricks-batching-by-length">TRICKS: BATCHING BY LENGTH</a></li>
   </ul>
 </nav>
     </div>
@@ -890,8 +892,7 @@ sequences to match the length of the longest sequence in the batch.</p>
 </span></span><span style="display:flex;"><span>        src, tgt <span style="color:#f92672">=</span> src<span style="color:#f92672">.</span>to(device), tgt<span style="color:#f92672">.</span>to(device)
 </span></span><span style="display:flex;"><span>        tgt_in, tgt_out <span style="color:#f92672">=</span> tgt[:, :<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>], tgt[:, <span style="color:#ae81ff">1</span>:]
 </span></span><span style="display:flex;"><span>        logits <span style="color:#f92672">=</span> transformer(src, tgt_in, (src <span style="color:#f92672">!=</span> pad_idx))
-</span></span><span style="display:flex;"><span>        loss <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>cross_entropy(
-</span></span><span style="display:flex;"><span>            logits<span style="color:#f92672">.</span>permute(<span style="color:#ae81ff">0</span>,<span style="color:#ae81ff">2</span>,<span style="color:#ae81ff">1</span>), tgt_out, ignore_index<span style="color:#f92672">=</span>pad_idx)
+</span></span><span style="display:flex;"><span>        loss <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>cross_entropy(logits<span style="color:#f92672">.</span>permute(<span style="color:#ae81ff">0</span>,<span style="color:#ae81ff">2</span>,<span style="color:#ae81ff">1</span>), tgt_out, ignore_index<span style="color:#f92672">=</span>pad_idx)
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>        optim<span style="color:#f92672">.</span>zero_grad()
 </span></span><span style="display:flex;"><span>        loss<span style="color:#f92672">.</span>backward()
@@ -910,6 +911,138 @@ the <code>&lt;END&gt;</code> token, we only want the model to predict it. When c
 we compare the predictions of the model with all but the first element of the
 target sequence. To generate the mask for the source sequence we will simply
 compare each source token with the <code>&lt;PAD&gt;</code> tag.</p>
+<h2 id="machine-translation">MACHINE TRANSLATION<a href="#machine-translation" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>Finally, let us consider a more realistic example using the Multi30k
+German-English translation dataset.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> torch.nn.utils.rnn <span style="color:#f92672">import</span> pad_sequence
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> torchtext.datasets <span style="color:#f92672">import</span> Multi30k
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> torchtext.data.utils <span style="color:#f92672">import</span> get_tokenizer
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> torchtext.vocab <span style="color:#f92672">import</span> vocab
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>train_data <span style="color:#f92672">=</span> Multi30k(root<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;datasets&#34;</span>, split<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;train&#34;</span>)
+</span></span><span style="display:flex;"><span>train_data <span style="color:#f92672">=</span> [(src, tgt) <span style="color:#66d9ef">for</span> src, tgt <span style="color:#f92672">in</span> train_data <span style="color:#66d9ef">if</span> len(src) <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>UNK, PAD, BOS, EOS <span style="color:#f92672">=</span> (<span style="color:#e6db74">&#34;&lt;UNK&gt;&#34;</span>, <span style="color:#e6db74">&#34;&lt;PAD&gt;&#34;</span>, <span style="color:#e6db74">&#34;&lt;START&gt;&#34;</span>, <span style="color:#e6db74">&#34;&lt;END&gt;&#34;</span>)
+</span></span><span style="display:flex;"><span>tokenizer <span style="color:#f92672">=</span> get_tokenizer(<span style="color:#e6db74">&#34;basic_english&#34;</span>)
+</span></span><span style="display:flex;"><span>en_counter, de_counter <span style="color:#f92672">=</span> Counter(), Counter()
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> src, tgt <span style="color:#f92672">in</span> train_data:
+</span></span><span style="display:flex;"><span>    en_counter<span style="color:#f92672">.</span>update(tokenizer(src))
+</span></span><span style="display:flex;"><span>    de_counter<span style="color:#f92672">.</span>update(tokenizer(tgt))
+</span></span><span style="display:flex;"><span>de_vocab <span style="color:#f92672">=</span> vocab(en_counter, specials<span style="color:#f92672">=</span>[UNK, PAD, BOS, EOS])
+</span></span><span style="display:flex;"><span>de_vocab<span style="color:#f92672">.</span>set_default_index(de_vocab[UNK])
+</span></span><span style="display:flex;"><span>en_vocab <span style="color:#f92672">=</span> vocab(de_counter, specials<span style="color:#f92672">=</span>[UNK, PAD, BOS, EOS])
+</span></span><span style="display:flex;"><span>en_vocab<span style="color:#f92672">.</span>set_default_index(en_vocab[UNK])
+</span></span><span style="display:flex;"><span>pad_idx <span style="color:#f92672">=</span> de_vocab[PAD] <span style="color:#75715e"># pad_idx is 1</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">assert</span> en_vocab[PAD] <span style="color:#f92672">==</span> de_vocab[PAD]
+</span></span></code></pre></div><p>We will use a very basic english tokenizer for both languages. We will also use
+the torchtext vocab object to create a vocabulary that supports mapping from
+tokens to indices and vice-versa.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>lengths <span style="color:#f92672">=</span> [len(src) <span style="color:#66d9ef">for</span> src, _ <span style="color:#f92672">in</span> train_data]
+</span></span><span style="display:flex;"><span>batch_size <span style="color:#f92672">=</span> <span style="color:#ae81ff">128</span>
+</span></span><span style="display:flex;"><span>train_loader <span style="color:#f92672">=</span> data<span style="color:#f92672">.</span>DataLoader(
+</span></span><span style="display:flex;"><span>    dataset<span style="color:#f92672">=</span>train_data,
+</span></span><span style="display:flex;"><span>    batch_size<span style="color:#f92672">=</span>batch_size, shuffle<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>, drop_last<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>,
+</span></span><span style="display:flex;"><span>    collate_fn<span style="color:#f92672">=</span><span style="color:#66d9ef">lambda</span> batch: (
+</span></span><span style="display:flex;"><span>        pad_sequence(
+</span></span><span style="display:flex;"><span>            [torch<span style="color:#f92672">.</span>LongTensor(de_vocab(tokenizer(x))) <span style="color:#66d9ef">for</span> x, _ <span style="color:#f92672">in</span> batch],
+</span></span><span style="display:flex;"><span>            batch_first<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>, padding_value<span style="color:#f92672">=</span>pad_idx),
+</span></span><span style="display:flex;"><span>        pad_sequence(
+</span></span><span style="display:flex;"><span>            [torch<span style="color:#f92672">.</span>LongTensor(en_vocab([BOS] <span style="color:#f92672">+</span> tokenizer(y) <span style="color:#f92672">+</span> [EOS])) <span style="color:#66d9ef">for</span> _, y <span style="color:#f92672">in</span> batch],
+</span></span><span style="display:flex;"><span>            batch_first<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>, padding_value<span style="color:#f92672">=</span>pad_idx),
+</span></span><span style="display:flex;"><span>    ),
+</span></span><span style="display:flex;"><span>    num_workers<span style="color:#f92672">=</span><span style="color:#ae81ff">4</span>,
+</span></span><span style="display:flex;"><span>)
+</span></span></code></pre></div><p>When initializing the data loader we will provide a collate function that will
+tokenize and then pad the src and tgt sequences. For the tgt sequence we also
+add the <code>&lt;START&gt;</code> and <code>&lt;END&gt;</code> tokens.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>transformer <span style="color:#f92672">=</span> Transformer(
+</span></span><span style="display:flex;"><span>    src_vocab_size<span style="color:#f92672">=</span>len(de_vocab), tgt_vocab_size<span style="color:#f92672">=</span>len(en_vocab), max_seq_len<span style="color:#f92672">=</span><span style="color:#ae81ff">256</span>,
+</span></span><span style="display:flex;"><span>    d_model<span style="color:#f92672">=</span><span style="color:#ae81ff">256</span>, n_heads<span style="color:#f92672">=</span><span style="color:#ae81ff">8</span>, n_enc<span style="color:#f92672">=</span><span style="color:#ae81ff">4</span>, n_dec<span style="color:#f92672">=</span><span style="color:#ae81ff">4</span>, dim_mlp<span style="color:#f92672">=</span><span style="color:#ae81ff">512</span>, dropout<span style="color:#f92672">=</span><span style="color:#ae81ff">0.1</span>,
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>transformer<span style="color:#f92672">.</span>to(device)
+</span></span><span style="display:flex;"><span>optim <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>optim<span style="color:#f92672">.</span>AdamW(transformer<span style="color:#f92672">.</span>parameters(), lr<span style="color:#f92672">=</span><span style="color:#ae81ff">1e-4</span>, weight_decay<span style="color:#f92672">=</span><span style="color:#ae81ff">1e-4</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> e <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">30</span>):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> src, tgt <span style="color:#f92672">in</span> train_loader:
+</span></span><span style="display:flex;"><span>        src, tgt <span style="color:#f92672">=</span> src<span style="color:#f92672">.</span>to(device), tgt<span style="color:#f92672">.</span>to(device)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Forward pass.</span>
+</span></span><span style="display:flex;"><span>        tgt_in, tgt_out <span style="color:#f92672">=</span> tgt[:, :<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>], tgt[:, <span style="color:#ae81ff">1</span>:]
+</span></span><span style="display:flex;"><span>        src_mask <span style="color:#f92672">=</span> (src <span style="color:#f92672">!=</span> pad_idx)
+</span></span><span style="display:flex;"><span>        logits <span style="color:#f92672">=</span> transformer(src, tgt_in, src_mask)
+</span></span><span style="display:flex;"><span>        loss <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>cross_entropy(logits<span style="color:#f92672">.</span>permute(<span style="color:#ae81ff">0</span>,<span style="color:#ae81ff">2</span>,<span style="color:#ae81ff">1</span>), tgt_out, ignore_index<span style="color:#f92672">=</span>pad_idx)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># Back-prop.</span>
+</span></span><span style="display:flex;"><span>        optim<span style="color:#f92672">.</span>zero_grad()
+</span></span><span style="display:flex;"><span>        loss<span style="color:#f92672">.</span>backward()
+</span></span><span style="display:flex;"><span>        torch<span style="color:#f92672">.</span>nn<span style="color:#f92672">.</span>utils<span style="color:#f92672">.</span>clip_grad_norm_(transformer<span style="color:#f92672">.</span>parameters(), <span style="color:#ae81ff">1.</span>)
+</span></span><span style="display:flex;"><span>        optim<span style="color:#f92672">.</span>step()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>sent <span style="color:#f92672">=</span> [<span style="color:#e6db74">&#34;zwei&#34;</span>, <span style="color:#e6db74">&#34;frauen&#34;</span>, <span style="color:#e6db74">&#34;spazieren&#34;</span>, <span style="color:#e6db74">&#34;und&#34;</span>, <span style="color:#e6db74">&#34;lachen&#34;</span>, <span style="color:#e6db74">&#34;im&#34;</span>, <span style="color:#e6db74">&#34;park&#34;</span>, <span style="color:#e6db74">&#34;.&#34;</span>]
+</span></span><span style="display:flex;"><span>x <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>LongTensor(de_vocab(sent))<span style="color:#f92672">.</span>unsqueeze(dim<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>)<span style="color:#f92672">.</span>to(device)
+</span></span><span style="display:flex;"><span>y <span style="color:#f92672">=</span> transformer<span style="color:#f92672">.</span>greedy_decode(x, <span style="color:#66d9ef">None</span>, en_vocab[BOS], en_vocab[EOS])
+</span></span><span style="display:flex;"><span>print(en_vocab<span style="color:#f92672">.</span>lookup_tokens(y[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>tolist()))
+</span></span><span style="display:flex;"><span><span style="color:#f92672">&gt;&gt;&gt;</span> [<span style="color:#e6db74">&#39;&lt;START&gt;&#39;</span>, <span style="color:#e6db74">&#39;two&#39;</span>, <span style="color:#e6db74">&#39;women&#39;</span>, <span style="color:#e6db74">&#39;are&#39;</span>, <span style="color:#e6db74">&#39;walking&#39;</span>, <span style="color:#e6db74">&#39;and&#39;</span>, <span style="color:#e6db74">&#39;laughing&#39;</span>, <span style="color:#e6db74">&#39;in&#39;</span>, <span style="color:#e6db74">&#39;the&#39;</span>, <span style="color:#e6db74">&#39;park&#39;</span>, <span style="color:#e6db74">&#39;.&#39;</span>, <span style="color:#e6db74">&#39;&lt;END&gt;&#39;</span>]
+</span></span></code></pre></div><p>The dataset is fairly small so we won&rsquo;t need a big model. Using these settings
+the model has $12.5M$ params, and in only 30 epochs (20 mins on may laptop) it
+learns to generate some decent looking translations.</p>
+<h2 id="tricks-batching-by-length">TRICKS: BATCHING BY LENGTH<a href="#tricks-batching-by-length" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>When sampling batches we actually want to have sequences with similar lengths in
+each batch, so that there is minimum padding. For this reason we will provide
+our own batch sampler that does that.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">BatchSampler</span>:
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, lengths, batch_size):
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>lengths <span style="color:#f92672">=</span> lengths
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>batch_size <span style="color:#f92672">=</span> batch_size
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __iter__(self):
+</span></span><span style="display:flex;"><span>        size <span style="color:#f92672">=</span> len(self<span style="color:#f92672">.</span>lengths)
+</span></span><span style="display:flex;"><span>        indices <span style="color:#f92672">=</span> list(range(size))
+</span></span><span style="display:flex;"><span>        random<span style="color:#f92672">.</span>shuffle(indices)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        step <span style="color:#f92672">=</span> <span style="color:#ae81ff">100</span> <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>batch_size
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>, size, step):
+</span></span><span style="display:flex;"><span>            pool <span style="color:#f92672">=</span> indices[i:i<span style="color:#f92672">+</span>step]
+</span></span><span style="display:flex;"><span>            pool <span style="color:#f92672">=</span> sorted(pool, key<span style="color:#f92672">=</span><span style="color:#66d9ef">lambda</span> x: self<span style="color:#f92672">.</span>lengths[x])
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">for</span> j <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>, len(pool), self<span style="color:#f92672">.</span>batch_size):
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">if</span> j <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>batch_size <span style="color:#f92672">&gt;</span> len(pool): <span style="color:#75715e"># assume drop_last=True</span>
+</span></span><span style="display:flex;"><span>                    <span style="color:#66d9ef">break</span>
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e"># Ideally, there should also be some shuffling here.</span>
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">yield</span> pool[j:j<span style="color:#f92672">+</span>self<span style="color:#f92672">.</span>batch_size]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __len__(self): <span style="color:#66d9ef">return</span> len(self<span style="color:#f92672">.</span>lengths) <span style="color:#f92672">//</span> self<span style="color:#f92672">.</span>batch_size
+</span></span></code></pre></div><p>The batch sampler is initialized by providing a list with the lengths of each
+of the sequences in the dataset. During iteration, the sampler will hold a pool
+of sequence indices sorted by sequence length. Each batch will be drawn from the
+sorted pool, thus reducing the amount of padding. We chose here the pool to be
+$100 \times$ the batch size, but for other tasks a different setting might work
+better. Note that we are also implementing the <code>__len__</code> method, which would
+allow us to call <code>len()</code> on the data loader.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>train_loader <span style="color:#f92672">=</span> data<span style="color:#f92672">.</span>DataLoader(
+</span></span><span style="display:flex;"><span>    dataset<span style="color:#f92672">=</span>train_data,
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># batch_size=batch_size, shuffle=True, drop_last=True,</span>
+</span></span><span style="display:flex;"><span>    batch_sampler<span style="color:#f92672">=</span>BatchSampler(lengths, batch_size),
+</span></span><span style="display:flex;"><span>    collate_fn<span style="color:#f92672">=</span><span style="color:#66d9ef">lambda</span> batch: (
+</span></span><span style="display:flex;"><span>        pad_sequence(
+</span></span><span style="display:flex;"><span>            [torch<span style="color:#f92672">.</span>LongTensor(de_vocab(tokenizer(x))) <span style="color:#66d9ef">for</span> x, _ <span style="color:#f92672">in</span> batch],
+</span></span><span style="display:flex;"><span>            batch_first<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>, padding_value<span style="color:#f92672">=</span>pad_idx),
+</span></span><span style="display:flex;"><span>        pad_sequence(
+</span></span><span style="display:flex;"><span>            [torch<span style="color:#f92672">.</span>LongTensor(en_vocab([BOS] <span style="color:#f92672">+</span> tokenizer(y) <span style="color:#f92672">+</span> [EOS])) <span style="color:#66d9ef">for</span> _, y <span style="color:#f92672">in</span> batch],
+</span></span><span style="display:flex;"><span>            batch_first<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>, padding_value<span style="color:#f92672">=</span>pad_idx),
+</span></span><span style="display:flex;"><span>    ),
+</span></span><span style="display:flex;"><span>    num_workers<span style="color:#f92672">=</span><span style="color:#ae81ff">4</span>,
+</span></span><span style="display:flex;"><span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>sum((x <span style="color:#f92672">==</span> pad_idx)<span style="color:#f92672">.</span>sum() <span style="color:#f92672">/</span> x<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">0</span>] <span style="color:#66d9ef">for</span> x, _ <span style="color:#f92672">in</span> train_loader) <span style="color:#f92672">/</span> len(train_loader)
+</span></span><span style="display:flex;"><span><span style="color:#f92672">&gt;&gt;&gt;</span> <span style="color:#ae81ff">15.25</span> <span style="color:#75715e"># when no special batching</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">&gt;&gt;&gt;</span> <span style="color:#ae81ff">3.62</span>  <span style="color:#75715e"># with our batch sampler</span>
+</span></span></code></pre></div><p>When initializing the data loader, instead of providing the batch size
+parameter, we will pass an instance of our batch sampler. To measure the
+effectiveness of our batch sampler we will calculate the average number of pads
+per sequence.</p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
 <!-- raw HTML omitted -->
 <!-- raw HTML omitted -->
 <div class="footnotes" role="doc-endnotes">
