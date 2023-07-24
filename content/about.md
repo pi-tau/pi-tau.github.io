@@ -1,6 +1,6 @@
 ---
 title: About
-keywords: ["ai", "deep learning", "rl", "generative models", "research"]
+description: Some info about me and my personal interests.
 ---
 
 # Hey!

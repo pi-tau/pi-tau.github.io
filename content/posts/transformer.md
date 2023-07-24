@@ -4,8 +4,8 @@ sitemap:
     priority: 0.9
 title: An annotatedER Transformer
 date: 2023-07-13
-description: A blog post about the Transformer model with even more annotations
-keywords: ["transformer", "nlp", "deep learning", "multi-head attention", "implementation details", "explained", "positional embeddings", "weight sharing", "minimum padding", "similar sequence length batching"]
+description: A blog post with a step-by-step implementation of the Transformer model with even more annotations. Specific design choices are discussed and hidden implementation details are highlighted. At the end you can see an example training on the Multi30k machine translation dataset.
+keywords: ["transformer", "multi-head attention", "transformer implementation details", "transformer explained", "positional embeddings", "weight sharing of embeddings", "minimum padding in a batch", "similar sequence length batching", "multi30k machine translation", "self attention explained"]
 mathjax: true
 ToC: true
 ---
@@ -17,7 +17,7 @@ I decided to add some more annotations regarding the architecture of the
 transformer model[^Transformer] and why some specific design choices were made.
 
 But first, a longer explanation about the attention layer in the transformer...
-If you don't feel like reading then [Skip](#multi-head-attention-layer) to the
+If you don't feel like reading then [skip](#multi-head-attention-layer) to the
 first code snippet or check out the full implementation on
 [github](https://github.com/pi-tau/transformer).
 
@@ -196,6 +196,7 @@ variance of the attention score between any query and key we get:
 
 $$ \alpha = q_i k_j^T = \sum_{n=1}^{d_k} q_{in} k_{jn} $$
 $$ \text{Var}(\alpha) = d_k $$
+$$ \text{std}(\alpha) = \sqrt{d_k} $$
 
 Applying softmax on the attention scores with such high variance will result in
 all of the weight being placed on one random element, while all the other
@@ -874,7 +875,6 @@ our own batch sampler that does that.
 
 ```python
 class BatchSampler:
-
     def __init__(self, lengths, batch_size):
         self.lengths = lengths
         self.batch_size = batch_size
@@ -932,8 +932,9 @@ effectiveness of our batch sampler we will calculate the average number of pads
 per sequence.
 
 
-<!-- # TODO -->
+<!-- TODO -->
 <!-- ## TRICKS: LABEL SMOOTHING -->
+<!-- ## TRICKS: BEAM SEARCH -->
 
 <!--
 # MISC

@@ -28,8 +28,8 @@ languages:
     title: pi-tau
 
     params:
-      subtitle: in a galaxy far far away
-      keywords: ''
+      subtitle: My personal blog where I share some cool content about deep learning, reinforcement learning and other CS stuff.
+      keywords: ai, deep learning, reinforcement learning, rl, generative models, research, computer science, computer vision, nlp, pytorch
       menuMore: Show more
       readMore: Read more
       readOtherPosts: Read other posts

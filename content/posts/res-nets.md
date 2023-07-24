@@ -4,8 +4,8 @@ sitemap:
     priority: 0.9
 title: ResNet, ResNeXt, RegNet,... what else?
 date: 2023-07-01
-description: A brief history of the most famous CNN architecture and how it was further improved
-keywords: ["cnn", "computer vision", "deep learning", "resnet", "resnext", "implementation details", "explained"]
+description: A brief history of the most famous CNN architecture and how it was further improved. The evolution of the residual block is discussed and a procedure for designing the full residual network model is given.
+keywords: ["cnn", "resnet", "resnext", "residual networks implementation details", "resnet explained", "architectural design of resnet", "residual block", "bottleneck residual block"]
 mathjax: True
 ToC: true
 ---

@@ -6,8 +6,8 @@
   
   <meta http-equiv="content-type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="A blog post about the Transformer model with even more annotations" />
-<meta name="keywords" content="transformer, nlp, deep learning, multi-head attention, implementation details, explained, positional embeddings, weight sharing, minimum padding, similar sequence length batching" />
+<meta name="description" content="A blog post with a step-by-step implementation of the Transformer model with even more annotations. Specific design choices are discussed and hidden implementation details are highlighted. At the end you can see an example training on the Multi30k machine translation dataset." />
+<meta name="keywords" content="transformer, multi-head attention, transformer implementation details, transformer explained, positional embeddings, weight sharing of embeddings, minimum padding in a batch, similar sequence length batching, multi30k machine translation, self attention explained" />
 
   <meta name="robots" content="follow, index" />
 
@@ -43,7 +43,7 @@
 <meta property="og:locale" content="en" />
 <meta property="og:type" content="article" />
 <meta property="og:title" content="An annotatedER Transformer">
-<meta property="og:description" content="A blog post about the Transformer model with even more annotations" />
+<meta property="og:description" content="A blog post with a step-by-step implementation of the Transformer model with even more annotations. Specific design choices are discussed and hidden implementation details are highlighted. At the end you can see an example training on the Multi30k machine translation dataset." />
 <meta property="og:url" content="/posts/transformer/" />
 <meta property="og:site_name" content="pi-tau" />
 
@@ -206,7 +206,7 @@ and its <a href="http://nlp.seas.harvard.edu/2018/04/03/attention.html">older ve
 I decided to add some more annotations regarding the architecture of the
 transformer model<sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup> and why some specific design choices were made.</p>
 <p>But first, a longer explanation about the attention layer in the transformer&hellip;
-If you don&rsquo;t feel like reading then <a href="#multi-head-attention-layer">Skip</a> to the
+If you don&rsquo;t feel like reading then <a href="#multi-head-attention-layer">skip</a> to the
 first code snippet or check out the full implementation on
 <a href="https://github.com/pi-tau/transformer">github</a>.</p>
 <h2 id="attention">ATTENTION<a href="#attention" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
@@ -368,7 +368,8 @@ the dimensionality of the key embedding space. To see why this is done let&rsquo
 assume that the keys and queries have zero mean and unit std. Then for the
 variance of the attention score between any query and key we get:</p>
 <p>$$ \alpha = q_i k_j^T = \sum_{n=1}^{d_k} q_{in} k_{jn} $$
-$$ \text{Var}(\alpha) = d_k $$</p>
+$$ \text{Var}(\alpha) = d_k $$
+$$ \text{std}(\alpha) = \sqrt{d_k} $$</p>
 <p>Applying softmax on the attention scores with such high variance will result in
 all of the weight being placed on one random element, while all the other
 elements will have a weight of zero. Thus, in order to have the attention scores
@@ -991,7 +992,6 @@ learns to generate some decent looking translations.</p>
 each batch, so that there is minimum padding. For this reason we will provide
 our own batch sampler that does that.</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">BatchSampler</span>:
-</span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, lengths, batch_size):
 </span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>lengths <span style="color:#f92672">=</span> lengths
 </span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>batch_size <span style="color:#f92672">=</span> batch_size
@@ -1041,6 +1041,7 @@ allow us to call <code>len()</code> on the data loader.</p>
 parameter, we will pass an instance of our batch sampler. To measure the
 effectiveness of our batch sampler we will calculate the average number of pads
 per sequence.</p>
+<!-- raw HTML omitted -->
 <!-- raw HTML omitted -->
 <!-- raw HTML omitted -->
 <!-- raw HTML omitted -->

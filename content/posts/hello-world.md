@@ -4,10 +4,10 @@ sitemap:
     priority: 0.1
 title: Hello World
 date: 2023-06-30
-description: " "
+description: "My first blog post where I share my ideas for this blog and my motivation for starting it."
 ---
 
-# MY FIRST BLOG POST
+## MY FIRST BLOG POST
 
 Okay, so yeah. I will be starting a blog post. Probably, I will be blogging mostly
 about stuff connected to computer science and/or machine learning, but we'll see.
