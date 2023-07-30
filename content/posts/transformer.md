@@ -2,7 +2,7 @@
 sitemap:
     changefreq: weekly
     priority: 0.9
-title: An annotatedER Transformer
+title: An even more annotated Transformer
 date: 2023-07-13
 description: A blog post with a step-by-step implementation of the Transformer model with even more annotations. Specific design choices are discussed and hidden implementation details are highlighted. At the end you can see an example training on the Multi30k machine translation dataset.
 keywords: ["transformer", "multi-head attention", "transformer implementation details", "transformer explained", "positional embeddings", "weight sharing of embeddings", "minimum padding in a batch", "similar sequence length batching", "multi30k machine translation", "self attention explained"]
@@ -860,7 +860,8 @@ sent = ["zwei", "frauen", "spazieren", "und", "lachen", "im", "park", "."]
 x = torch.LongTensor(de_vocab(sent)).unsqueeze(dim=0).to(device)
 y = transformer.greedy_decode(x, None, en_vocab[BOS], en_vocab[EOS])
 print(en_vocab.lookup_tokens(y[0].tolist()))
->>> ['<START>', 'two', 'women', 'are', 'walking', 'and', 'laughing', 'in', 'the', 'park', '.', '<END>']
+>>> ['<START>', 'two', 'women', 'are', 'walking', 'and', 'laughing', 'in', 'the',
+     'park', '.', '<END>']
 ```
 
 The dataset is fairly small so we won't need a big model. Using these settings
@@ -894,7 +895,8 @@ class BatchSampler:
                 # Ideally, there should also be some shuffling here.
                 yield pool[j:j+self.batch_size]
 
-    def __len__(self): return len(self.lengths) // self.batch_size
+    def __len__(self):
+        return len(self.lengths) // self.batch_size
 ```
 
 The batch sampler is initialized by providing a list with the lengths of each
