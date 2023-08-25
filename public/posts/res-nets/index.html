@@ -328,7 +328,7 @@ that we only get diminishing returns.</p>
 means is, instead of stacking more layers, we increase the number of channels in
 each of the convolutional layers. This effectively makes our networks learn
 features in higher dimensional spaces. This idea is thoroughly explored in the
-<a href="https://arxiv.org/abs/1605.07146">paper</a><sup id="fnref1:5"><a href="#fn:5" class="footnote-ref" role="doc-noteref">5</a></sup> <em>&ldquo;Wide residual networks&rdquo;</em> by
+<a href="https://arxiv.org/abs/1605.07146">paper</a><sup id="fnref:5"><a href="#fn:5" class="footnote-ref" role="doc-noteref">5</a></sup> <em>&ldquo;Wide residual networks&rdquo;</em> by
 Zagoruyko and Komodakis. A wider network having 50 layers but twice the channels
 in each of these layers outperforms the ResNet-152 on ImageNet.</p>
 <p>Unfortunately, increasing the number of channels increases the computational
@@ -417,7 +417,7 @@ branch we need to add a batch norm and a relu layers before the $1 \times 1$
 convolution.</p>
 <p>The final ResNet architecture consists of stacking ResBlocks, with occasionally
 downscaling the image with Downscale ResBlocks. After that a Global average
-pooling layer is applied as proposed in [<sup id="fnref1:7"><a href="#fn:7" class="footnote-ref" role="doc-noteref">7</a></sup>]. The original idea was to have
+pooling layer is applied as proposed in [<sup id="fnref:7"><a href="#fn:7" class="footnote-ref" role="doc-noteref">7</a></sup>]. The original idea was to have
 the final convolution produce a tensor with the same number of channels as the
 number of classes, each channel corresponding to a confidence map for the given
 class. Replacing FC layers with global average pooling would not be as effective
@@ -447,7 +447,7 @@ $C_1, C_2, C_3, \dots$, the blocks within each stage $B_1, B_2, B_3, \dots$,
 and also the groups within each block (if using ResNeXt blocks)
 $g_1, g_2, g_3, \dots$. Exploring the possible combinations to find the best
 solution is clearly infeasible, but there are a few guiding principles that we
-can use. The paper<sup id="fnref1:10"><a href="#fn:10" class="footnote-ref" role="doc-noteref">10</a></sup> <em>&ldquo;Designing network design spaces&rdquo;</em> by Iliya
+can use. The paper<sup id="fnref:10"><a href="#fn:10" class="footnote-ref" role="doc-noteref">10</a></sup> <em>&ldquo;Designing network design spaces&rdquo;</em> by Iliya
 Radosavovic et al. explores what the relation between these parameters should
 be, so that models at any scale would perform well. This lead to the design of
 the RegNet and the following principles:</p>
@@ -463,63 +463,63 @@ networks with four stages.</li>
 <li>Best performing models are usually around 20 blocks deep in total, and the
 other parameters are used to control the number of FLOPs.</li>
 </ol>
-<div class="footnotes" role="doc-endnotes">
+<section class="footnotes" role="doc-endnotes">
 <hr>
 <ol>
-<li id="fn:1">
+<li id="fn:1" role="doc-endnote">
 <p><a href="https://arxiv.org/abs/1512.03385">2015</a> &ldquo;Deep residual learning for image
 recognition&rdquo; by Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun&#160;<a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
-<li id="fn:2">
+<li id="fn:2" role="doc-endnote">
 <p><a href="https://arxiv.org/abs/1502.03167">2015</a> &ldquo;Batch normalization: Accelerating
 deep network training by reducing internal covariate shift&rdquo; by Sergey Ioffe,
 Christian Szegedy&#160;<a href="#fnref:2" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
-<li id="fn:3">
+<li id="fn:3" role="doc-endnote">
 <p><a href="http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf">2011</a>
 &ldquo;Understanding the difficulty of training deep feedforward neural networks&rdquo; by
 Xavier Glorot and Yoshua Bengio&#160;<a href="#fnref:3" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
-<li id="fn:4">
+<li id="fn:4" role="doc-endnote">
 <p><a href="https://arxiv.org/abs/1502.01852">2015</a> &ldquo;Delving deep into rectifiers:
 Surpassing human-level performance on ImageNet classification&rdquo; by Kaiming He,
 Xiangyu Zhang, Shaoqing Ren, Jian Sun&#160;<a href="#fnref:4" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
-<li id="fn:5">
+<li id="fn:5" role="doc-endnote">
 <p><a href="https://arxiv.org/abs/1605.07146">2016</a> &ldquo;Wide residual networks&rdquo; by
-Sergey Zagoruyko and Nikos Komodakis&#160;<a href="#fnref:5" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a>&#160;<a href="#fnref1:5" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+Sergey Zagoruyko and Nikos Komodakis&#160;<a href="#fnref:5" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
-<li id="fn:6">
+<li id="fn:6" role="doc-endnote">
 <p><a href="https://arxiv.org/abs/1603.05027">2016</a> &ldquo;Identity mappings in deep
 residualnNetworks&rdquo; by Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun&#160;<a href="#fnref:6" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
-<li id="fn:7">
+<li id="fn:7" role="doc-endnote">
 <p><a href="https://arxiv.org/abs/1312.4400">2013</a> &ldquo;Network in network&rdquo; by Min Lin,
-Qiang Chen, Shuicheng Yan&#160;<a href="#fnref:7" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a>&#160;<a href="#fnref1:7" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+Qiang Chen, Shuicheng Yan&#160;<a href="#fnref:7" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
-<li id="fn:8">
+<li id="fn:8" role="doc-endnote">
 <p><a href="https://arxiv.org/abs/1611.05431">2016</a> &ldquo;Aggregated residual
 transformations for deep neural networks&rdquo; by Saining Xie, Ross Girshick,
 Piotr Dollár, Zhuowen Tu, Kaiming He&#160;<a href="#fnref:8" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
-<li id="fn:9">
+<li id="fn:9" role="doc-endnote">
 <p><a href="https://arxiv.org/abs/1409.4842">2014</a> &ldquo;Going deeper with
 convolutions&rdquo; by Christian Szegedy, Wei Liu, Yangqing Jia, Pierre Sermanet,
 Scott Reed, Dragomir Anguelov, Dumitru Erhan, Vincent Vanhoucke, Andrew Rabinovich&#160;<a href="#fnref:9" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
-<li id="fn:10">
+<li id="fn:10" role="doc-endnote">
 <p><a href="https://arxiv.org/abs/2003.13678">2020</a> &ldquo;Designing network design
 spaces&rdquo; by Ilija Radosavovic, Raj Prateek Kosaraju, Ross Girshick, Kaiming He,
-Piotr Dollár&#160;<a href="#fnref:10" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a>&#160;<a href="#fnref1:10" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+Piotr Dollár&#160;<a href="#fnref:10" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
-<li id="fn:11">
+<li id="fn:11" role="doc-endnote">
 <p><a href="https://arxiv.org/abs/1704.04861">2017</a> &ldquo;MobileNets: efficient
 convolutional neural networks for mobile vision application&rdquo; by Andrew G. Howard,
 Menglong Zhu, Bo Chen, Dmitry Kalenichenko, Weijun Wang, Tobias Weyand, Marco
 Andreetto, Hartwig Adam&#160;<a href="#fnref:11" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
 </li>
 </ol>
-</div>
+</section>
 
       </div></div>
 

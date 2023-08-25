@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  
+    <title>Which policy gradient algorithm are you using? :: pi-tau</title>
+  
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="An in depth, detailed review of some of the most famous policy gradient algorithms. Starting from vanilla policy gradient, then discussing actor-critic algorithms and finally visiting PPO. Reference implementations are shown and step-by-step improvements are discussed." />
+<meta name="keywords" content="reinforcement learning, policy gradient, vpg, ppo, actor-critic, a2c, gae, parallel environment, entropy regularization, atari, Lunar Lander" />
+
+  <meta name="robots" content="follow, index" />
+
+<link rel="canonical" href="/posts/actor-critic/" />
+
+
+
+
+
+
+  
+  
+  
+  
+  
+  <link rel="stylesheet" href="/styles.css">
+
+
+
+
+
+
+
+  <link rel="shortcut icon" href="/img/theme-colors/orange.png">
+  <link rel="apple-touch-icon" href="/img/theme-colors/orange.png">
+
+
+
+<meta name="twitter:card" content="summary" />
+
+
+
+<meta property="og:locale" content="en" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Which policy gradient algorithm are you using?">
+<meta property="og:description" content="An in depth, detailed review of some of the most famous policy gradient algorithms. Starting from vanilla policy gradient, then discussing actor-critic algorithms and finally visiting PPO. Reference implementations are shown and step-by-step improvements are discussed." />
+<meta property="og:url" content="/posts/actor-critic/" />
+<meta property="og:site_name" content="pi-tau" />
+
+  
+    <meta property="og:image" content="/img/favicon/orange.png">
+  
+
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="627">
+
+
+  <meta property="article:published_time" content="2023-08-25 00:00:00 &#43;0000 UTC" />
+
+
+
+
+
+
+
+
+
+
+
+
+</head>
+<body class="orange">
+
+
+<div class="container headings--one-size">
+
+  <header class="header">
+  <div class="header__inner">
+    <div class="header__logo">
+      <a href="/">
+  <div class="logo">
+    Terminal
+  </div>
+</a>
+
+    </div>
+    
+      <ul class="menu menu--mobile">
+  <li class="menu__trigger">Menu&nbsp;▾</li>
+  <li>
+    <ul class="menu__dropdown">
+      
+        
+          <li><a href="/about">About</a></li>
+        
+      
+        
+          <li><a href="/contact">Contact</a></li>
+        
+      
+        
+          <li><a href="/posts">Posts</a></li>
+        
+      
+      
+    </ul>
+  </li>
+</ul>
+
+    
+    
+  </div>
+  
+    <nav class="navigation-menu">
+  <ul class="navigation-menu__inner menu--desktop">
+    
+      
+        
+          <li><a href="/about" >About</a></li>
+        
+      
+        
+          <li><a href="/contact" >Contact</a></li>
+        
+      
+        
+          <li><a href="/posts" >Posts</a></li>
+        
+      
+      
+    
+  </ul>
+</nav>
+
+  
+</header>
+
+
+  <div class="content">
+    
+
+
+
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script type="text/javascript" id="MathJax-script" async
+src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[', '\\]']],
+        processEscapes: true,
+        processEnvironments: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+      }
+    };
+
+    window.addEventListener('load', (event) => {
+        document.querySelectorAll("mjx-container").forEach(function(x){
+          x.parentElement.classList += 'has-jax'})
+      });
+
+</script>
+
+
+
+<article class="post">
+  <h1 class="post-title">
+    <a href="/posts/actor-critic/">Which policy gradient algorithm are you using?</a>
+  </h1>
+  <div class="post-meta"><time class="post-date">2023-08-25</time></div>
+
+  
+  
+
+
+  
+    <div class="table-of-contents">
+      <h2>
+        CONTENTS
+      </h2>
+      <nav id="TableOfContents">
+  <ul>
+    <li><a href="#vanilla-policy-gradient">VANILLA POLICY GRADIENT</a></li>
+    <li><a href="#vpg-with-baseline">VPG WITH BASELINE</a></li>
+    <li><a href="#online-advantage-actor-critic">ONLINE ADVANTAGE ACTOR-CRITIC</a></li>
+    <li><a href="#multi-step-a2c">MULTI-STEP A2C</a></li>
+    <li><a href="#gae">GAE</a></li>
+    <li><a href="#ppo">PPO</a></li>
+  </ul>
+</nav>
+    </div>
+  
+
+  <div class="post-content"><div>
+        <p>So, you probably all know the formula for updating the policy network using the
+policy gradient theorem:</p>
+<p>$$ \nabla_\theta J(\theta) = E_{a, s \sim \pi_\theta} \Big[ \nabla \log \pi_\theta(a|s) R(s, a) \Big]. $$</p>
+<p>Here, the action $a$ is drawn from the current policy $\pi_\theta$. The state
+$s$ is sampled from the state distribution function of the environment by
+following $\pi_\theta$. And $R(s, a)$ is the return obtained for the state $s$
+if you select action $a$ and would continue to follow the policy $\pi_\theta$.
+In order to update, you perform a rollout with your current policy, you estimate
+the gradient using this formula, and you backpropagate. I will not go into
+detail where this formula comes from, but if you want to read more you can check
+out <a href="https://lilianweng.github.io/posts/2018-04-08-policy-gradient/#proof-of-policy-gradient-theorem">this comprehensive blog
+post</a>
+from Lilian Weng.</p>
+<p>You&rsquo;ve probably also heard that there are different algorithms for computing the
+return $R$, e.g. Monte-Carlo, actor-critic, A2C, GAE, etc. What we will do is
+start from the most basic algorithm - vanilla policy gradient, and continuously
+improve on it until we arrive at the most successful and widely used algorithm
+today - PPO. Each agent that we implement will conform to the following api:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Agent</span>:
+    <span style="color:#66d9ef">def</span> __init__(self, policy_network, value_network):
+        self<span style="color:#f92672">.</span>policy_network <span style="color:#f92672">=</span> policy_network
+        self<span style="color:#f92672">.</span>value_network <span style="color:#f92672">=</span> value_network
+
+    <span style="color:#a6e22e">@torch</span><span style="color:#f92672">.</span>no_grad()
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">policy</span>(self, s):
+        <span style="color:#66d9ef">return</span> Categorical(logits<span style="color:#f92672">=</span>self<span style="color:#f92672">.</span>policy_network(s))
+
+    <span style="color:#a6e22e">@torch</span><span style="color:#f92672">.</span>no_grad()
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">value</span>(self, s):
+        <span style="color:#66d9ef">return</span> self<span style="color:#f92672">.</span>value_network(s)
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">update</span>(self, states, actions, rewards):
+        <span style="color:#66d9ef">raise</span> <span style="color:#a6e22e">RuntimeError</span>(<span style="color:#e6db74">&#34;not implemented&#34;</span>)
+</code></pre></div><p>Disclaimer: The code snippets given in this blog post will probably not work
+directly out of the box. The full working code as well as results on training
+these agents on the Atari game LunarLander can be seen on
+<a href="https://github.com/pi-tau/playing-with-RL-models">github</a>.</p>
+<h2 id="vanilla-policy-gradient">VANILLA POLICY GRADIENT<a href="#vanilla-policy-gradient" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>In vanilla policy gradient (VPG) there is nothing fancy; we just calculate the
+return $R$ as a Monte-Carlo estimate. We perform a full episode rollout and we
+collect the states, actions, and rewards ($s_t$, $a_t$, $r_{t+1}$) at each step
+until we reach a terminal state. Once we&rsquo;ve reached the terminal state we can
+estimate the return for each of the visited states:</p>
+<p>$$ R_t = \sum_{i=t}^{T} r_{i+1}. $$</p>
+<p>Finally we compute the gradient:</p>
+<p>$$ \nabla_\theta J(\theta) = \frac{1}{T} \sum_{t=1}^{T} \nabla \log \pi_\theta (a_t | s_t) R_t. $$</p>
+<p>Each of the states was visited using the current policy and the state
+distribution function of the environment, so for each state-action pair we can
+compute an estimate of the gradient. Then, we average over the samples, much
+like a mini-batch update in supervised learning.</p>
+<p>To implement this algorithm we will first make use of a function that describes
+an agent-environment loop. We will assume that <code>env</code> is a non-vectorized
+environment that conforms to the <a href="https://gymnasium.farama.org/api/env/">OpenAI Gym
+API</a>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">environment_loop</span>(agent, env, num_iters):
+    <span style="color:#66d9ef">for</span> _ <span style="color:#f92672">in</span> range(num_iters):
+        states, actions, rewards <span style="color:#f92672">=</span> [], [], []
+        s, _ <span style="color:#f92672">=</span> env<span style="color:#f92672">.</span>reset()
+        done <span style="color:#f92672">=</span> <span style="color:#66d9ef">False</span>
+        <span style="color:#66d9ef">while</span> <span style="color:#f92672">not</span> done:
+            states<span style="color:#f92672">.</span>append(s)
+            act <span style="color:#f92672">=</span> agent<span style="color:#f92672">.</span>policy(s)<span style="color:#f92672">.</span>sample() <span style="color:#75715e"># policy() returns a distribution</span>
+            s, r, t, tr, _ <span style="color:#f92672">=</span> env<span style="color:#f92672">.</span>step(acts)
+            actions<span style="color:#f92672">.</span>append(act)
+            rewards<span style="color:#f92672">.</span>append(r)
+            done <span style="color:#f92672">=</span> (t <span style="color:#f92672">|</span> tr)
+
+        agent<span style="color:#f92672">.</span>update(np<span style="color:#f92672">.</span>array(states), np<span style="color:#f92672">.</span>array(actions), np<span style="color:#f92672">.</span>array(rewards))
+</code></pre></div><p>The environment loop will run multiple iterations and on each iteration it will
+rollout an episode using the current policy, and then it will update the policy
+using the sampled data.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">VPGAgent</span>(Agent):
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">update</span>(self, states, actions, rewards):
+        T <span style="color:#f92672">=</span> rewards<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">0</span>]
+        returns <span style="color:#f92672">=</span> rewards <span style="color:#f92672">@</span> np<span style="color:#f92672">.</span>tril(np<span style="color:#f92672">.</span>ones(T))
+        returns <span style="color:#f92672">=</span> (returns <span style="color:#f92672">-</span> returns<span style="color:#f92672">.</span>mean()) <span style="color:#f92672">/</span> (returns<span style="color:#f92672">.</span>std() <span style="color:#f92672">+</span> <span style="color:#ae81ff">1e-8</span>)
+        logits <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>policy_network(states)
+        logp <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>cross_entropy(logits, actions, reduction<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;none&#34;</span>)
+        loss <span style="color:#f92672">=</span> (logp <span style="color:#f92672">*</span> returns)<span style="color:#f92672">.</span>mean()
+
+        self<span style="color:#f92672">.</span>optim<span style="color:#f92672">.</span>zero_grad() <span style="color:#75715e"># assume optim is defined in agent.__init__()</span>
+        loss<span style="color:#f92672">.</span>backward()
+        self<span style="color:#f92672">.</span>optim<span style="color:#f92672">.</span>step()
+</code></pre></div><p>The returns are calculated by simply adding the rewards obtained from the given
+time-step onwards. I&rsquo;ve used a simple vector-matrix multiplication here where I
+multiply the rewards vector by a lower-triangular matrix of ones in order to get
+the desired sums.</p>
+<p>One trick that is usually done in practice is to normalize the returns before
+computing the gradient. This is done in order to stabilize the training of the
+neural network. Note that this modification <a href="https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html#expected-grad-log-prob-lemma">does not change the
+expectation</a>
+of the gradient estimation.</p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<h2 id="vpg-with-baseline">VPG WITH BASELINE<a href="#vpg-with-baseline" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>Since the single-sample Monte-Carlo estimate of the returns might have a lot of
+variance, we may want to perform multiple rollouts instead of just one. That is,
+rollout several episodes and only then calculate the gradient and backpropagate.
+However, it is not clear how helpful that would be because you will still get
+(mostly) single-sample Monte-Carlo estimates; it&rsquo;s just that you will have more
+data points in the batch. To see why is that, consider rolling out a second
+episode with the same policy. At some step $t_d$ your second rollout will
+diverge from the first rollout and from then onward you will sample new states
+and for the returns of these states you will have single-sample estimates. Only
+for the states before step $t_d$ you will have a more accurate estimate.</p>
+<p>A much better approach to reduce the variance of the estimation would be to
+<a href="https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html#baselines-in-policy-gradients">add a baseline</a>
+to the estimate of the return.</p>
+<p>We will baseline the returns using the value function $V^{\pi}(s)$. As a side
+note: the <a href="https://arxiv.org/abs/1301.2315">best baseline in terms of variance
+reduction</a><sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup> is actually:</p>
+<p>$$E_{a \sim \pi_\theta} \Bigg[ \frac{
+\nabla \log^2 \pi_\theta (a|s) R(s, a) }{
+\nabla \log^2 \pi_\theta (a|s)
+} \Bigg], $$</p>
+<p>and the baseline that we are using is $V(s) = \mathbb{E} \Big[ R(s, a) \Big]$.</p>
+<p>The formula for the gradient now becomes:</p>
+<p>$$
+\begin{align}
+\nabla_\theta J(\theta) &amp;= E_{a, s \sim \pi_\theta} \Big[ \nabla \log \pi_\theta(a|s) R(s, a) - V(s) \Big] \\
+&amp;= E_{a, s \sim \pi_\theta} \Big[ \nabla \log \pi_\theta(a|s) A(s, a) \Big],
+\end{align}
+$$</p>
+<p>where $A(s, a)$ is the <em>advantage</em>, describing how much better it is to take
+action $a$ compared to the other actions.</p>
+<p>The value function is approximated using a second neural network which is
+trained concurrently with the policy. The update function will be modified like
+this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">VPGAgent</span>(Agent):
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">update</span>(self, states, actions, rewards):
+        T <span style="color:#f92672">=</span> rewards<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">0</span>]
+        returns <span style="color:#f92672">=</span> rewards <span style="color:#f92672">@</span> np<span style="color:#f92672">.</span>tril(np<span style="color:#f92672">.</span>ones(T))
+        adv <span style="color:#f92672">=</span> returns <span style="color:#f92672">-</span> self<span style="color:#f92672">.</span>value(states)
+
+        <span style="color:#75715e"># Update the policy network.</span>
+        adv <span style="color:#f92672">=</span> (adv <span style="color:#f92672">-</span> adv<span style="color:#f92672">.</span>mean()) <span style="color:#f92672">/</span> (adv<span style="color:#f92672">.</span>std() <span style="color:#f92672">+</span> <span style="color:#ae81ff">1e-8</span>)
+        logits <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>policy_network(states)
+        logp <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>cross_entropy(logits, actions, reduction<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;none&#34;</span>)
+        loss <span style="color:#f92672">=</span> (logp <span style="color:#f92672">*</span> adv)<span style="color:#f92672">.</span>mean()
+
+        self<span style="color:#f92672">.</span>policy_optim<span style="color:#f92672">.</span>zero_grad() <span style="color:#75715e"># assume defined in agent.__init__()</span>
+        loss<span style="color:#f92672">.</span>backward()
+        self<span style="color:#f92672">.</span>policy_optim<span style="color:#f92672">.</span>step()
+
+        <span style="color:#75715e"># Update the value network.</span>
+        <span style="color:#66d9ef">for</span> o, r <span style="color:#f92672">in</span> DataLoader((states, returns), self<span style="color:#f92672">.</span>batch_size):
+            pred <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value_network()
+            vf_loss <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>mse_loss(pred, r)
+            self<span style="color:#f92672">.</span>value_optim<span style="color:#f92672">.</span>zero_grad() <span style="color:#75715e"># assume defined in agent.__init__()</span>
+            vf_loss<span style="color:#f92672">.</span>backward()
+            self<span style="color:#f92672">.</span>value_optim<span style="color:#f92672">.</span>step()
+</code></pre></div><p>Note that even though we baseline the returns we are still normalizing the
+advantages after that. This effectively means that we are using a different
+baseline and not $V(s)$, but as already explained this will not change the
+expectation of the gradient. It will simply improve the training of our network.</p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<h2 id="online-advantage-actor-critic">ONLINE ADVANTAGE ACTOR-CRITIC<a href="#online-advantage-actor-critic" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>Now that we have a value network we can actually compute the return by
+bootstrapping instead of using a Monte-Carlo estimate:</p>
+<p>$$ R(s_t, a_t) = r_{t+1} + V(s_{t+1}). $$</p>
+<p>This is the so-called actor-critic setup, where we have an actor (the policy
+network) that selects actions to perform the rollout and a critic (the value
+network) that is used to compute the returns, i.e. it grades the performance.</p>
+<p>Combining the actor-critic with a baseline we get the advantage actor-critic
+(<a href="https://arxiv.org/abs/1602.01783">A2C</a><sup id="fnref:2"><a href="#fn:2" class="footnote-ref" role="doc-noteref">2</a></sup>). The formula for the gradient
+now becomes:</p>
+<p>$$ \nabla_\theta J(\theta) = E_{a, s, r \sim \pi_\theta} \Big[ \nabla \log \pi_\theta(a|s) \Big( r + V(s') - V(s) \Big) \Big]. $$</p>
+<p>Here $r$ is the reward obtained when performing action $a$, and $s'$ is the next
+state of the environment.</p>
+<p>With this setup we actually don&rsquo;t have to run episodes until the end. In fact we
+can update the policy (and the value network) at every single step. But that is
+not a very good idea because we will be estimating the gradient using a single
+sample. Instead, what we could do is:</p>
+<ul>
+<li>either run multiple environments in parallel in order to obtain multiple
+samples at every step,</li>
+<li>or rollout the episode for several steps and only then perform the update.</li>
+</ul>
+<p>We will actually do both.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">environment_loop</span>(agent<span style="color:#f92672">.</span> env, num_iters, steps):
+    num_envs <span style="color:#f92672">=</span> env<span style="color:#f92672">.</span>num_envs
+    s, _ <span style="color:#f92672">=</span> env<span style="color:#f92672">.</span>reset()
+
+    states <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros(
+        shape<span style="color:#f92672">=</span>(steps, num_envs, <span style="color:#f92672">*</span>env<span style="color:#f92672">.</span>single_observation_space<span style="color:#f92672">.</span>shape),
+        dtype<span style="color:#f92672">=</span>np<span style="color:#f92672">.</span>float32,
+    )
+    next_states <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros_like(states)
+    actions <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros(shape<span style="color:#f92672">=</span>(steps, num_envs), dtype<span style="color:#f92672">=</span>int)
+    rewards <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros(shape<span style="color:#f92672">=</span>(steps, num_envs), dtype<span style="color:#f92672">=</span>np<span style="color:#f92672">.</span>float32)
+    done <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros(shape<span style="color:#f92672">=</span>(steps, num_envs), dtype<span style="color:#f92672">=</span>bool)
+
+    <span style="color:#66d9ef">for</span> _ <span style="color:#f92672">in</span> range(num_iters):
+        <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(steps):
+            states[i] <span style="color:#f92672">=</span> s
+            acts <span style="color:#f92672">=</span> agent<span style="color:#f92672">.</span>policy(s)<span style="color:#f92672">.</span>sample()
+            s, r, t, tr, info <span style="color:#f92672">=</span> env<span style="color:#f92672">.</span>step(acts)
+
+            actions[i] <span style="color:#f92672">=</span> acts
+            rewards[i] <span style="color:#f92672">=</span> r
+            next_states[i] <span style="color:#f92672">=</span> s
+            done[i] <span style="color:#f92672">=</span> (t <span style="color:#f92672">|</span> tr)
+
+        agent<span style="color:#f92672">.</span>update(states, actions, rewards, next_states, done)
+</code></pre></div><p>We will now assume that <code>env</code> is a <a href="https://gymnasium.farama.org/api/vector/">vectorized
+environment</a>. The environment loop
+will run multiple iterations and on each iteration it will rollout the policy
+for a fixed amount of steps. Note that vectorized environments will auto-reset
+any sub-environment that is terminated or truncated. This means that a given
+segment of experiences might contain data from multiple episodes, and for this
+reason we will use the <code>done</code> tensor to indicate which of the states are
+terminal states.</p>
+<p>Once we update, we continue stepping the vectorized environment from where we
+left off, i.e. the environment is not reset at the beginning of the new
+iteration. This is actually very helpful in the case of long horizon tasks where
+episodes could be extremely long (think 100K steps).</p>
+<p>The update function is not much different, but note that it now accepts
+additional parameters:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">A2CAgent</span>(Agent):
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">update</span>(self, states, actions, rewards, next_states, done):
+        values <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value(states)
+        next_values <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value(next_states)
+        next_values <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>where(done, <span style="color:#ae81ff">0.</span>, next_values)
+        returns <span style="color:#f92672">=</span> rewards <span style="color:#f92672">+</span> next_values
+        adv <span style="color:#f92672">=</span> rewards <span style="color:#f92672">+</span> next_values <span style="color:#f92672">-</span> values
+
+        <span style="color:#75715e"># Update the policy network.</span>
+        adv <span style="color:#f92672">=</span> (adv <span style="color:#f92672">-</span> adv<span style="color:#f92672">.</span>mean()) <span style="color:#f92672">/</span> (adv<span style="color:#f92672">.</span>std() <span style="color:#f92672">+</span> <span style="color:#ae81ff">1e-8</span>)
+        logits <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>policy_network(states)
+        logp <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>cross_entropy(logits, actions, reduction<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;none&#34;</span>)
+        loss <span style="color:#f92672">=</span> (logp <span style="color:#f92672">*</span> adv)<span style="color:#f92672">.</span>mean()
+
+        self<span style="color:#f92672">.</span>policy_optim<span style="color:#f92672">.</span>zero_grad()
+        loss<span style="color:#f92672">.</span>backward()
+        self<span style="color:#f92672">.</span>policy_optim<span style="color:#f92672">.</span>step()
+
+        <span style="color:#75715e"># Update the value network.</span>
+        <span style="color:#66d9ef">for</span> o, r <span style="color:#f92672">in</span> DataLoader((states, returns), self<span style="color:#f92672">.</span>batch_size):
+            pred <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value_network()
+            vf_loss <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>mse_loss(pred, r)
+            self<span style="color:#f92672">.</span>value_optim<span style="color:#f92672">.</span>zero_grad()
+            vf_loss<span style="color:#f92672">.</span>backward()
+            self<span style="color:#f92672">.</span>value_optim<span style="color:#f92672">.</span>step()
+</code></pre></div><p>Here we can see how we are actually using the information provided by <code>done</code>: in
+case our agent steps a sub-environment from its current state into a terminal
+state, then we should treat the obtained reward as the true return for that
+state - no bootstrapping.</p>
+<h2 id="multi-step-a2c">MULTI-STEP A2C<a href="#multi-step-a2c" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>The A2C algorithm provides additional variance reduction by bootstrapping the
+estimate of the gradient, but it also adds bias to the estimate. While the
+vanilla policy gradient provides an un-biased estimator for the gradient, the
+A2C is not.</p>
+<p>With the current setup there is one very obvious improvement that we could do to
+reduce the bias of the gradient estimate. Note that we are rolling out the
+policy for multiple steps, but we are computing the return using a single-step
+bootstrap. What we could do instead is use an n-step bootstrap estimation: the
+return for each state will be computed by summing all the rewards along the
+current trajectory and only at the end we will bootstrap:</p>
+<p>$$ R(s_t, a_t) = r_{t+1} + r_{t+2} + \cdots + r_{T} + V(s_{T}). $$</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">A2CAgent</span>(Agent):
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">update</span>(self, states, actions, rewards, next_states, done):
+        values <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value(states)
+        next_values <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value(next_states)
+        next_values <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>where(done, <span style="color:#ae81ff">0.</span>, next_values)
+
+        N, T <span style="color:#f92672">=</span> rewards<span style="color:#f92672">.</span>shape
+        returns <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros_like(rewards)
+        returns[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>where(done[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>], rewards[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>], values[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>])
+        <span style="color:#66d9ef">for</span> t <span style="color:#f92672">in</span> range(T<span style="color:#f92672">-</span><span style="color:#ae81ff">2</span>, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>):
+            returns[:, t] <span style="color:#f92672">=</span> rewards[:, t] <span style="color:#f92672">+</span> returns[:, t<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">*</span> <span style="color:#f92672">~</span>done[:, t]
+        adv <span style="color:#f92672">=</span> returns <span style="color:#f92672">-</span> values
+
+        <span style="color:#75715e"># Update the policy network.</span>
+        adv <span style="color:#f92672">=</span> (adv <span style="color:#f92672">-</span> adv<span style="color:#f92672">.</span>mean()) <span style="color:#f92672">/</span> (adv<span style="color:#f92672">.</span>std() <span style="color:#f92672">+</span> <span style="color:#ae81ff">1e-8</span>)
+        logits <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>policy_network(states)
+        logp <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>cross_entropy(logits, actions, reduction<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;none&#34;</span>)
+        loss <span style="color:#f92672">=</span> (logp <span style="color:#f92672">*</span> adv)<span style="color:#f92672">.</span>mean()
+
+        self<span style="color:#f92672">.</span>policy_optim<span style="color:#f92672">.</span>zero_grad()
+        loss<span style="color:#f92672">.</span>backward()
+        self<span style="color:#f92672">.</span>policy_optim<span style="color:#f92672">.</span>step()
+
+        <span style="color:#75715e"># Update the value network.</span>
+        <span style="color:#66d9ef">for</span> o, r <span style="color:#f92672">in</span> DataLoader((states, returns), self<span style="color:#f92672">.</span>batch_size):
+            pred <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value_network()
+            vf_loss <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>mse_loss(pred, r)
+            self<span style="color:#f92672">.</span>value_optim<span style="color:#f92672">.</span>zero_grad()
+            vf_loss<span style="color:#f92672">.</span>backward()
+            self<span style="color:#f92672">.</span>value_optim<span style="color:#f92672">.</span>step()
+</code></pre></div><p>The computation of the returns might seem a bit confusing at first, because it
+runs the loop in reverse, starting from the end. We only need to bootstrap at
+the end for non-terminal states, and then we just keep adding the rewards from
+the previous steps to the current estimate of the return. If at some point we
+reach a terminal state, then the return is simply the obtained reward - no
+bootstrapping.</p>
+<h2 id="gae">GAE<a href="#gae" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>Note that estimating the return using an n-step bootstrap reduces the bias, but
+increases the variance of the estimate. There is an obvious trade-off between
+bias and variance when choosing how large $n$ should be, i.e. how many steps to
+perform in the agent-environment loop.</p>
+<p>An effective approach to reduce the variance and perfectly balance the trade-off
+is the <a href="https://arxiv.org/abs/1506.02438">Generalized Advantage
+Estimation</a>(GAE)<sup id="fnref:3"><a href="#fn:3" class="footnote-ref" role="doc-noteref">3</a></sup>. The formula is very
+similar to $TD(\lambda)$ where we have a weighted summation of different n-step
+returns. The $TD(\lambda)$-return is given by:</p>
+<p>$$
+\begin{align}
+R^{\lambda}(s_t, a_t) &amp; = (1-\lambda) \Big( r_{t+1} + V(s_{t+1}) \Big) + \\
+&amp; + (1-\lambda)\lambda \Big( r_{t+1} + r_{t+2} + V(s_{t+2}) \Big) + \\
+&amp; + \cdots + \\
+&amp; + (1-\lambda)\lambda^{T-t-2} \Big( r_{t+1} + r_{t+2} + \cdots + r_{T-1} + V(s_{T-1}) \Big) + \\
+&amp; + \lambda^{T-t-1} \Big( r_{t+1} + r_{t+2} + \cdots + r_{T} + V(s_{T}) \Big).
+\end{align}
+$$</p>
+<p>Here $\lambda$ is a parameter that controls the exponential weighting of the
+different n-step returns. For $\lambda=0$ we get the simple one-step return used
+in online A2C, and for $\lambda=1$ we get the full n-step return used in the
+multi-step A2C.</p>
+<p>To get the generalized advantage estimator we simply subtract the value of $s_t$:
+$$ A^{GAE}(s_t, a_t) = R^{\lambda}(s_t, a_t) - V(s_t). $$</p>
+<p>Let us define $\delta_t = r_{t+1} + V(s_{t+1}) - V(s_t)$. Working with
+advantages instead of returns will actually allow us to nicely simplify the
+formula using telescoping sums. For example the two-step advantage can be
+written as:
+$$
+\begin{aligned}
+A_t^{(2)} &amp;= r_{t+1} + r_{t+2} + V(s_{t+2}) - V(s_t) \\
+&amp;= r_{t+1} + V(s_{t+1}) - V(s_t) + r_{t+2} + V(s_{t+2}) - V(s_{t+1}) \\
+&amp;= \delta_t + \delta_{t+1}.
+\end{aligned}
+$$</p>
+<p>Finally, for the GAE we get:
+$$ A^{GAE} = \sum_{i=0}^{T-t-1} \lambda^{i} \delta_{t+i}. $$</p>
+<p>Again, I am glossing over the details of how this formula is derived, and why it
+works, but if you want to read more I suggest checking ot <a href="https://danieltakeshi.github.io/2017/04/02/notes-on-the-generalized-advantage-estimation-paper/">this blog
+post</a>.</p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<p>To use GAE in our A2C agent we simply have to modify the way we estimate the
+advantages:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">A2CAgent</span>(Agent):
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">update</span>(self, states, actions, rewards, next_states, done):
+        values <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value(states)
+        next_values <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value(next_states)
+        next_values <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>where(done, <span style="color:#ae81ff">0.</span>, next_values)
+
+        N, T <span style="color:#f92672">=</span> rewards<span style="color:#f92672">.</span>shape
+        adv <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros_like(rewards)
+        adv[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>where(done[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>], rewards[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">-</span> values[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>], <span style="color:#ae81ff">0.</span>)
+        <span style="color:#66d9ef">for</span> t <span style="color:#f92672">in</span> range(T<span style="color:#f92672">-</span><span style="color:#ae81ff">2</span>, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>):
+            delta <span style="color:#f92672">=</span> rewards[:, t] <span style="color:#f92672">+</span> values[:, t<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">*</span> <span style="color:#f92672">~</span>done[:, t] <span style="color:#f92672">-</span> values[:, t]
+            adv[:, t] <span style="color:#f92672">=</span> delta <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>lamb <span style="color:#f92672">*</span> adv[:, t<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">*</span> <span style="color:#f92672">~</span>done[:, t]
+        returns <span style="color:#f92672">=</span> adv <span style="color:#f92672">+</span> values
+
+        <span style="color:#75715e"># Update the policy network.</span>
+        adv <span style="color:#f92672">=</span> (adv <span style="color:#f92672">-</span> adv<span style="color:#f92672">.</span>mean()) <span style="color:#f92672">/</span> (adv<span style="color:#f92672">.</span>std() <span style="color:#f92672">+</span> <span style="color:#ae81ff">1e-8</span>)
+        logits <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>policy_network(states)
+        logp <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>cross_entropy(logits, actions, reduction<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;none&#34;</span>)
+        loss <span style="color:#f92672">=</span> (logp <span style="color:#f92672">*</span> adv)<span style="color:#f92672">.</span>mean()
+
+        self<span style="color:#f92672">.</span>policy_optim<span style="color:#f92672">.</span>zero_grad()
+        loss<span style="color:#f92672">.</span>backward()
+        self<span style="color:#f92672">.</span>policy_optim<span style="color:#f92672">.</span>step()
+
+        <span style="color:#75715e"># Update the value network.</span>
+        <span style="color:#66d9ef">for</span> o, r <span style="color:#f92672">in</span> DataLoader((states, returns), self<span style="color:#f92672">.</span>batch_size):
+            pred <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value_network()
+            vf_loss <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>mse_loss(pred, r)
+            self<span style="color:#f92672">.</span>value_optim<span style="color:#f92672">.</span>zero_grad()
+            vf_loss<span style="color:#f92672">.</span>backward()
+            self<span style="color:#f92672">.</span>value_optim<span style="color:#f92672">.</span>step()
+</code></pre></div><p>Again, the computation of the advantages might seem a bit confusing, but it
+follows a simple logic:</p>
+<ul>
+<li>bootstrap at the end for non-terminal states,</li>
+<li>at each step compute the current $\delta_t$ by making sure not to bootstrap
+on terminal states,</li>
+<li>compute the advantage by adding the $\delta_t$ to the running sum of deltas
+decayed by $\lambda$. Again make sure not to add anything if at a terminal
+state.</li>
+</ul>
+<p>Since we are directly computing the advantages, the returns are actually derived
+by reversing the equation: $R^{\lambda}(s_t, a_t) = A^{GAE}(s_t, a_t) + V(s_t)$.</p>
+<h2 id="ppo">PPO<a href="#ppo" class="hanchor" ariaLabel="Anchor">&#8983;</a> </h2>
+<p>Note that all of the policy updates that we did until now are simple &ldquo;vanilla&rdquo;
+updates: we simply update the policy once, using the estimate of the gradient,
+and then we discard the collected data. However, there is nothing stopping us
+from using a more sophisticated update algorithm. In fact, for the experiments
+in the GAE paper the authors use the
+<a href="https://arxiv.org/abs/1502.05477">TRPO</a><sup id="fnref:4"><a href="#fn:4" class="footnote-ref" role="doc-noteref">4</a></sup> update rule.</p>
+<p>(Not really shocking news, given that both TRPO and GAE are authored by the same
+people.)</p>
+<p>Here we will take a look at <a href="https://arxiv.org/abs/1707.06347">PPO</a><sup id="fnref:5"><a href="#fn:5" class="footnote-ref" role="doc-noteref">5</a></sup>. The
+problem that the authors are trying to solve is to come up with an algorithm
+that allows us to take the biggest possible update step on the policy parameters
+before throwing out the collected rollout data. The approach taken in this paper
+is to allow for multiple update steps that, when combined, would approximate
+this maximum possible update.</p>
+<p>Note that after we update the policy parameters once, $\pi_\theta =
+\pi_{\theta_{old}} + \nabla \theta_{old}$, every other update would actually be
+using off-policy data. To correct for this data miss-match we can use importance
+sampling:</p>
+<p>$$
+\begin{align}
+\displaystyle J(\theta)
+&amp; = E_{s_t \sim \mu_\theta, \space a_t \sim \pi_\theta}
+\bigg[ \sum_{t=1} r_{t+1}\bigg] \\
+&amp; = E_{s_t \sim \mu_\theta, \space a_t \sim \pi_\theta}
+\bigg[
+\frac{\pi_{\theta_{old}}(a|s)}{\pi_{\theta_{old}}(a|s)} \sum_{t=1} r_{t+1}
+\bigg] \\
+&amp; = E_{s_t \sim \mu_\theta, \space a_t \sim \pi_{\theta_{old}}}
+\bigg[
+\frac{\pi_{\theta_{old}}(a|s)}{\pi_\theta(a|s)} \sum_{t=1} r_{t+1}
+\bigg]
+\end{align}
+$$</p>
+<p>It seems like we could compute the objective to update the new policy weights
+using the data collected with the old policy weights, as long as we correct with
+the importance sampling weight:</p>
+<p>$$ \displaystyle \rho(\theta) = \frac{\pi_\theta(a|s)}{\pi_{\theta_{old}}(a|s)}. $$</p>
+<p>However, note that, in order to compute the correct gradient estimate, the
+actions have to be sampled under $\pi_{\theta_{old}}$, but the states have to be
+sampled under $\mu_\theta$. Unfortunately our data was sampled under
+$\mu_{\theta_{old}}$.</p>
+<p>How bad is that?</p>
+<p>It turns out that if $\pi_\theta$ does not deviate <em>too much</em> from
+$\pi_{\theta_{old}}$, then using the old data sampled from $\mu_{\theta_{old}}$
+is actually ok. The difference between the objectives calculated using
+$\mu_\theta$ and $\mu_{\theta_{old}}$ is bounded, and thus, optimizing one would
+also optimize the other. In simple words, it is ok to optimize the objective
+with the old data as long as $\pi_\theta$ is close to $\pi_{\theta_{old}}$. A
+proof of this claim can be found in Appendix A of the <a href="https://arxiv.org/abs/1502.05477">TRPO
+paper</a><sup id="fnref:4"><a href="#fn:4" class="footnote-ref" role="doc-noteref">4</a></sup>.</p>
+<p>There are two different proximal policy algorithms each using a different
+heuristic to try to ensure that $\pi_\theta$ is close to $\pi_{\theta_{old}}$:</p>
+<ul>
+<li>
+<p><strong>PPO-Penalty</strong> - constraints the <em>KL divergence</em> between the two
+distributions by adding it as a penalty to the objective:
+$$
+J(\theta) =
+E_{s_t \sim \mu_\theta, \space a_t \sim \pi_{\theta_{old}}}
+\bigg[
+\rho(\theta) A(s,a) - \beta KL(\pi_\theta(\cdot|s), \pi_{\theta_{old}}(\cdot|s))
+\bigg]
+$$</p>
+</li>
+<li>
+<p><strong>PPO-CLIP</strong> - clips the objective function if $\pi_\theta$ deviates too much
+from $\pi_{\theta_{old}}$:
+$$
+J(\theta) =
+E_{s_t \sim \mu_\theta, \space a_t \sim \pi_{\theta_{old}}}
+\bigg[
+\min \big(
+\rho(\theta) A(s,a), \space \text{clip}(\rho(\theta), 1-\epsilon, 1+\epsilon) A(s,a)
+\big)
+\bigg]
+$$</p>
+</li>
+</ul>
+<p>The algorithm implemented here is <strong>PPO-CLIP</strong> augmented with a check for early
+stopping. We will split the collected rollout data into mini-batches and we will
+iterate for several epochs over the batches. At the end of every epoch we will
+check the <em>KL divergence</em> between the original policy $\pi_{\theta_{old}}$ and
+the newest policy $\pi_\theta$. If a given threshold is reached, then we will
+stop updating and collect new rollout data.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">PPOAgent</span>(Agent):
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">update</span>(self, states, actions, rewards, next_states, done):
+        values <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value(states)
+        next_values <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value(next_states)
+        next_values <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>where(done, <span style="color:#ae81ff">0.</span>, next_values)
+
+        N, T <span style="color:#f92672">=</span> rewards<span style="color:#f92672">.</span>shape
+        adv <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros_like(rewards)
+        adv[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>where(done[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>], rewards[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">-</span> values[:, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>], <span style="color:#ae81ff">0.</span>)
+        <span style="color:#66d9ef">for</span> t <span style="color:#f92672">in</span> range(T<span style="color:#f92672">-</span><span style="color:#ae81ff">2</span>, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>):
+            delta <span style="color:#f92672">=</span> rewards[:, t] <span style="color:#f92672">+</span> values[:, t<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">*</span> <span style="color:#f92672">~</span>done[:, t] <span style="color:#f92672">-</span> values[:, t]
+            adv[:, t] <span style="color:#f92672">=</span> delta <span style="color:#f92672">+</span> self<span style="color:#f92672">.</span>lamb <span style="color:#f92672">*</span> adv[:, t<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>] <span style="color:#f92672">*</span> <span style="color:#f92672">~</span>done[:, t]
+        returns <span style="color:#f92672">=</span> adv <span style="color:#f92672">+</span> values
+
+        <span style="color:#75715e"># Update.</span>
+        logp_old <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>policy(states)<span style="color:#f92672">.</span>log_prob(actions)
+        values_old <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value(states)
+        <span style="color:#66d9ef">for</span> _ <span style="color:#f92672">in</span> range(self<span style="color:#f92672">.</span>n_epochs):
+            dataset <span style="color:#f92672">=</span> DataLoader(
+                (states, actions, returns, adv, logp_old, values_old),
+                self<span style="color:#f92672">.</span>batch_size,
+            )
+            <span style="color:#66d9ef">for</span> s, a, r, ad, lp_old, v_old <span style="color:#f92672">in</span> dataset:
+                <span style="color:#75715e"># Update the policy network.</span>
+                logits <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>policy_network(s)
+                logp <span style="color:#f92672">=</span> <span style="color:#f92672">-</span>F<span style="color:#f92672">.</span>cross_entropy(logits, a, reduction<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;none&#34;</span>)
+                rho <span style="color:#f92672">=</span> (logp <span style="color:#f92672">-</span> lp_old)<span style="color:#f92672">.</span>exp()
+                ad <span style="color:#f92672">=</span> (ad <span style="color:#f92672">-</span> ad<span style="color:#f92672">.</span>mean()) <span style="color:#f92672">/</span> (ad<span style="color:#f92672">.</span>std() <span style="color:#f92672">+</span> <span style="color:#ae81ff">1e-8</span>)
+                clip_adv <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>clip(rho, <span style="color:#ae81ff">1</span><span style="color:#f92672">-</span>self<span style="color:#f92672">.</span>pi_clip, <span style="color:#ae81ff">1</span><span style="color:#f92672">+</span>self<span style="color:#f92672">.</span>pi_clip) <span style="color:#f92672">*</span> ad
+                pi_loss <span style="color:#f92672">=</span> (min(rho <span style="color:#f92672">*</span> ad, clip_adv))<span style="color:#f92672">.</span>mean()
+                self<span style="color:#f92672">.</span>policy_optim<span style="color:#f92672">.</span>zero_grad()
+                pi_loss<span style="color:#f92672">.</span>backward()
+                self<span style="color:#f92672">.</span>policy_optim<span style="color:#f92672">.</span>step()
+
+                <span style="color:#75715e"># Update the value network.</span>
+                v_pred <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>value_network(s)
+                v_clip <span style="color:#f92672">=</span> v_old <span style="color:#f92672">+</span> np<span style="color:#f92672">.</span>clip(v_pred<span style="color:#f92672">-</span>v_old, <span style="color:#f92672">-</span>self<span style="color:#f92672">.</span>vf_clip, self<span style="color:#f92672">.</span>vf_clip)
+                vf_loss <span style="color:#f92672">=</span> (max((v_pred <span style="color:#f92672">-</span> r)<span style="color:#f92672">**</span><span style="color:#ae81ff">2</span>, (v_clip <span style="color:#f92672">-</span> r)<span style="color:#f92672">**</span><span style="color:#ae81ff">2</span>))<span style="color:#f92672">.</span>mean()
+                self<span style="color:#f92672">.</span>value_optim<span style="color:#f92672">.</span>zero_grad()
+                vf_loss<span style="color:#f92672">.</span>backward()
+                self<span style="color:#f92672">.</span>value_optim<span style="color:#f92672">.</span>step()
+
+            <span style="color:#75715e"># Check for early stopping.</span>
+            logp <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>policy(states)<span style="color:#f92672">.</span>log_prob(actions)
+            KL <span style="color:#f92672">=</span> logp_old <span style="color:#f92672">-</span> logp
+            <span style="color:#66d9ef">if</span> KL<span style="color:#f92672">.</span>mean() <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">1.5</span> <span style="color:#f92672">*</span> self<span style="color:#f92672">.</span>tgt_KL:
+                <span style="color:#66d9ef">break</span>
+</code></pre></div><p>Note that the advantages are normalized at the mini-batch level, in the
+beginning of every iteration before computing the loss. This should come as no
+surprise, because as we mentioned earlier, the goal of this normalization is to
+stabilize the gradient updates of the neural network. It has nothing to do with
+the baseline for the return.</p>
+<p>In addition to clipping the objective for the policy, we are also clipping the
+value function loss before updating the parameters of the value network. This
+approach was first introduced in the GAE paper<sup id="fnref:3"><a href="#fn:3" class="footnote-ref" role="doc-noteref">3</a></sup> (see Section 5), and was
+later also applied in the <a href="https://github.com/openai/baselines/blob/ea25b9e8b234e6ee1bca43083f8f3cf974143998/baselines/ppo2/model.py#L68-L75">official PPO
+implementation</a>.</p>
+<p>Finally, to compute the <em>KL divergence</em> between the new and the old policy we
+use the following equality:
+$$
+D_{KL}(P || Q) = \sum_{x} P(x) \log \frac{P(x)}{Q(x)} = \mathbb{E}_{x \sim P} \Big[ \log P(x) - \log Q(x) \Big].
+$$
+Checkout <a href="http://joschu.net/blog/kl-approx.html">this blog post</a> by John
+Schulman where he proposes a different unbiased estimator for the KL divergence
+that has less variance.</p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<section class="footnotes" role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn:1" role="doc-endnote">
+<p><a href="https://arxiv.org/abs/1301.2315">2013</a> &ldquo;The optimal reward baseline
+for gradient-based reinforcement learning&rdquo; by Lex Weaver, Nigel Tao&#160;<a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:2" role="doc-endnote">
+<p><a href="https://arxiv.org/abs/1602.01783">2016</a>) &ldquo;Asynchronous methods for deep
+reinforcement learning&rdquo; by Volodymyr Mnih, Adrià Puigdomènech Badia, Mehdi Mirza,
+Alex Graves, Timothy P. Lillicrap, Tim Harley, David Silver, Koray Kavukcuoglu&#160;<a href="#fnref:2" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:3" role="doc-endnote">
+<p><a href="https://arxiv.org/abs/1506.02438">2015</a> &ldquo;High-dimensional continuous
+control using generalized advantage estimation&rdquo; by John Schulman, Philipp Moritz,
+Sergey Levine, Michael Jordan, Pieter Abbeel&#160;<a href="#fnref:3" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:4" role="doc-endnote">
+<p><a href="https://arxiv.org/abs/1502.05477">2015</a> &ldquo;Trust Region Policy Optimization&rdquo;
+by John Schulman, Sergey Levine, Philipp Moritz, Michael I. Jordan, Pieter Abbeel&#160;<a href="#fnref:4" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:5" role="doc-endnote">
+<p><a href="https://arxiv.org/abs/1707.06347">2017</a> &ldquo;Proximal Policy Optimization
+Algorithms&rdquo; by John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford,
+Oleg Klimov&#160;<a href="#fnref:5" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+</ol>
+</section>
+
+      </div></div>
+
+  
+    
+<div class="pagination">
+    <div class="pagination__title">
+        <span class="pagination__title-h">Read other posts</span>
+        <hr />
+    </div>
+    <div class="pagination__buttons">
+        
+        
+        <span class="button next">
+            <a href="/posts/transformer/">
+                <span class="button__text">An even more annotated Transformer</span>
+                <span class="button__icon">→</span>
+            </a>
+        </span>
+        
+    </div>
+</div>
+
+  
+
+  
+    
+
+  
+</article>
+
+  </div>
+
+  
+    
+
+
+<footer class="footer">
+  <div class="footer__inner">
+    
+      <div class="copyright">
+        <span>© 2023 Powered by <a href="https://gohugo.io">Hugo</a></span>
+    
+      <span>:: <a href="https://github.com/panr/hugo-theme-terminal" target="_blank">Theme</a> made by <a href="https://github.com/panr" target="_blank">panr</a></span>
+      </div>
+  </div>
+</footer>
+
+
+
+
+
+
+<script type="text/javascript" src="/bundle.min.js"></script>
+
+
+  
+</div>
+
+</body>
+</html>
