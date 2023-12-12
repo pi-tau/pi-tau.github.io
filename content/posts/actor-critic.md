@@ -100,7 +100,7 @@ rollout an episode using the current policy, and then it will update the policy
 using the sampled data.
 
 ```python
-def VPGAgent(Agent):
+class VPGAgent(Agent):
     def update(self, states, actions, rewards):
         T = rewards.shape[0]
         returns = rewards @ np.tril(np.ones(T))
@@ -172,7 +172,7 @@ The value function is approximated using a second neural network which is
 trained concurrently with the policy. The update function will be modified like
 this:
 ```python
-def VPGAgent(Agent):
+class VPGAgent(Agent):
     def update(self, states, actions, rewards):
         T = rewards.shape[0]
         returns = rewards @ np.tril(np.ones(T))

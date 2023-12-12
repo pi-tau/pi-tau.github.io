@@ -267,7 +267,7 @@ API</a>.</p>
 </code></pre></div><p>The environment loop will run multiple iterations and on each iteration it will
 rollout an episode using the current policy, and then it will update the policy
 using the sampled data.</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">VPGAgent</span>(Agent):
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">VPGAgent</span>(Agent):
     <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">update</span>(self, states, actions, rewards):
         T <span style="color:#f92672">=</span> rewards<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">0</span>]
         returns <span style="color:#f92672">=</span> rewards <span style="color:#f92672">@</span> np<span style="color:#f92672">.</span>tril(np<span style="color:#f92672">.</span>ones(T))
@@ -324,7 +324,7 @@ action $a$ compared to the other actions.</p>
 <p>The value function is approximated using a second neural network which is
 trained concurrently with the policy. The update function will be modified like
 this:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">VPGAgent</span>(Agent):
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">VPGAgent</span>(Agent):
     <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">update</span>(self, states, actions, rewards):
         T <span style="color:#f92672">=</span> rewards<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">0</span>]
         returns <span style="color:#f92672">=</span> rewards <span style="color:#f92672">@</span> np<span style="color:#f92672">.</span>tril(np<span style="color:#f92672">.</span>ones(T))
