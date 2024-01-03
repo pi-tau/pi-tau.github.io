@@ -290,7 +290,7 @@ the first self-attention layer. Now each self-attention layer would have to
 learn this information based just on the input features, which is highly
 unlikely.
 
-Another subtlety is the use of fully-connected network. Since there are no
+Another subtlety is the use of a fully-connected network. Since there are no
 elementwise non-linearities in the self-attention layer, stacking more
 self-attention layers would just re-average the value vectors. Thus, a small
 neural net is added after each self-attention layer to post-process each output
