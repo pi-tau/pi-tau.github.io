@@ -655,7 +655,7 @@ add some text about entropy reg
 learning" by Ronald J. Williams
 [^Baseline]: [2013](https://arxiv.org/abs/1301.2315) "The optimal reward baseline
 for gradient-based reinforcement learning" by Lex Weaver, Nigel Tao
-[^A2C]: [2016](https://arxiv.org/abs/1602.01783)) "Asynchronous methods for deep
+[^A2C]: [2016](https://arxiv.org/abs/1602.01783) "Asynchronous methods for deep
 reinforcement learning" by Volodymyr Mnih, Adrià Puigdomènech Badia, Mehdi Mirza,
 Alex Graves, Timothy P. Lillicrap, Tim Harley, David Silver, Koray Kavukcuoglu
 [^GAE]: [2015](https://arxiv.org/abs/1506.02438) "High-dimensional continuous
